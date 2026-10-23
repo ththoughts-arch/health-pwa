@@ -268,6 +268,25 @@ p { margin: 0; }
 .cal-cell.level-1 { background: var(--accent-mid); }
 .cal-cell.level-2 { background: var(--accent-solid); }
 
+/* 영양제 목록 편집 */
+.chip-btn {
+  min-height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(255,255,255,0.7);
+  display: inline-flex; align-items: center; font-size: 12px; font-weight: 700;
+}
+.edit-row { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.edit-line { display: flex; align-items: center; gap: 8px; }
+.edit-name { flex: 1; min-width: 0; }
+.select {
+  min-height: 44px; min-width: 0; flex: 1; border: 1px solid #DDDFE6; border-radius: 12px; padding: 0 10px;
+  font-family: inherit; font-size: 15px; color: var(--ink); background: #FFFFFF;
+}
+.time-input-sm { width: 132px; flex-shrink: 0; font-size: 15px; text-align: center; padding: 0 6px; }
+.count-input { width: 64px; font-size: 16px; text-align: center; }
+.ghost-btn-sm { min-height: 44px; padding: 0 14px; font-size: 13px; flex-shrink: 0; }
+.add-form { gap: 10px; }
+.link-btn { display: flex; align-items: center; justify-content: center; margin-top: 12px; }
+.link-inline { display: block; padding: 6px 0; text-decoration: underline; text-underline-offset: 3px; }
+
 /* 로그인·설정 폼 */
 .form { gap: 16px; padding-top: 28px; }
 .field { display: flex; flex-direction: column; gap: 6px; }

@@ -52,6 +52,30 @@ export async function saveSupplement(fb, uid, date, id, { taken, count }) {
     { date, supplements: { [id]: entry }, updatedAt: serverTimestamp() }, { merge: true });
 }
 
+// 영양제 목록 (supplements/{id}). 삭제 대신 active:false → 지난 복용 기록 유지
+function supplementsCol(fb, uid) {
+  return fb.fs.collection(fb.db, 'users', uid, 'supplements');
+}
+
+export function newSupplementId(fb, uid) {
+  return fb.fs.doc(supplementsCol(fb, uid)).id;
+}
+
+export async function saveSupplementDef(fb, uid, id, fields, isNew = false) {
+  const { doc, setDoc, serverTimestamp } = fb.fs;
+  const data = isNew ? { ...fields, active: true, createdAt: serverTimestamp() } : fields;
+  await setDoc(doc(supplementsCol(fb, uid), id), data, { merge: true });
+}
+
+export async function seedSupplements(fb, uid, list) {
+  const { doc, writeBatch, serverTimestamp } = fb.fs;
+  const batch = writeBatch(fb.db);
+  for (const { id, ...s } of list) {
+    batch.set(doc(supplementsCol(fb, uid), id), { ...s, active: true, createdAt: serverTimestamp() }, { merge: true });
+  }
+  await batch.commit();
+}
+
 export async function saveSettings(fb, uid, patch) {
   const { doc, setDoc } = fb.fs;
   await setDoc(doc(fb.db, 'users', uid), { settings: patch }, { merge: true });

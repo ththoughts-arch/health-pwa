@@ -167,7 +167,7 @@ API 키·VAPID 키는 GitHub Secrets / 환경변수로만 관리하고 저장소
 - [x] 3. 데이터 저장 구조 설계(일별 웰니스, 활동, 영양제 기록, 바디 배터리 입력, 점수) — `docs/data-model.md`. Actions가 쓰는 `days`·`activities`는 앱에서 읽기만(규칙으로 강제), 사용자 입력은 `checkins`(날짜별 1문서)·`supplements`·`strength`. 다음 단계 전 Secrets `FIREBASE_SERVICE_ACCOUNT`, `OWNER_UID` 필요
 - [x] 4. 컨디션 점수 계산 모듈(기준값 30일, 기준값 수집 기간 처리) — `app/js/score.js`. 매일 07:30 KST `Daily sync` 워크플로(`scripts/sync.mjs`)가 최근 35일 `days`·`activities`를 Firestore에 기록
 - [x] 5. 화면 4개 구현(시안 기준) + 컨디션별 테마 전환 — `app/js/screens/*`, 로그인(이메일/비밀번호)·설정(평소 취침 시각) 포함. AI 문장 자리는 8단계 전까지 규칙 문장(`model.js headline` 등). 오늘 점수가 없으면(잠들기 전·동기화 전) 어제 점수를 "MM.DD 데이터 기준"으로 표시. 수면 질 척도(1 최상~4 나쁨)는 추정이라 실제 값 보고 확인 필요
-- [ ] 6. 영양제 등록·체크·알 수 기록
+- [x] 6. 영양제 등록·체크·알 수 기록 — 목록 편집 `#supplements-edit`(이름·시간대·알림 시각·1회 알 수, 변경 즉시 저장, 빼기 = `active:false`), 빈 목록이면 3장 영양제 7개로 시작 버튼. 체크·알 수는 `checkins/{date}.supplements.{id}`
 - [ ] 7. 헬스 수동 기록
 - [ ] 8. Gemini 분석(수면 평가·패턴·경고, 운동 두 모드) — 개인정보 제외, 하루 호출 최소화
 - [ ] 9. 웹 푸시: 아침 수면 분석, 영양제 시간, 취침 1시간 전

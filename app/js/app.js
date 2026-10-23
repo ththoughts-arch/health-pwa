@@ -1,6 +1,9 @@
 import { setCondition, conditionFromScore } from './theme.js';
 import { initFirebase } from './firebase.js';
-import { loadAll, saveBodyBattery, saveSettings, saveSupplement } from './data.js';
+import {
+  loadAll, newSupplementId, saveBodyBattery, saveSettings, saveSupplement, saveSupplementDef, seedSupplements,
+} from './data.js';
+import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
 import { renderLogin, loginErrorText } from './screens/login.js';
 import { renderToday } from './screens/today.js';
@@ -8,14 +11,19 @@ import { renderSleep } from './screens/sleep.js';
 import { renderExercise } from './screens/exercise.js';
 import { renderSupplements } from './screens/supplements.js';
 import { renderSettings } from './screens/settings.js';
+import { renderSupplementsEdit } from './screens/supplements-edit.js';
 
 const screens = {
   today: renderToday,
   sleep: renderSleep,
   exercise: renderExercise,
   supplements: renderSupplements,
+  'supplements-edit': renderSupplementsEdit,
   settings: renderSettings,
 };
+
+// 하위 화면에서 켜 둘 하단 탭
+const TAB_OF = { 'supplements-edit': 'supplements' };
 
 const state = {
   fb: null,
@@ -43,7 +51,7 @@ function render() {
   const name = route();
   tabbar.hidden = !state.user;
   tabbar.querySelectorAll('a').forEach((a) => {
-    if (a.dataset.tab === name) a.setAttribute('aria-current', 'page');
+    if (a.dataset.tab === (TAB_OF[name] ?? name)) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
 
@@ -95,6 +103,14 @@ function setSupplement(id, patch) {
   return saveSupplement(state.fb, state.user.uid, d.today, id, next);
 }
 
+// 영양제 목록 항목 수정 (화면 먼저, 저장은 뒤)
+function editSupplement(id, patch) {
+  const s = state.data.supplements.find((x) => x.id === id);
+  if (!s) return;
+  Object.assign(s, patch);
+  save(() => saveSupplementDef(state.fb, state.user.uid, id, patch));
+}
+
 const actions = {
   'sleep-range': (el) => { state.ui.sleepRange = el.dataset.range; render(); },
   sport: (el) => { state.ui.sport = el.dataset.sport; render(); },
@@ -108,6 +124,22 @@ const actions = {
     const item = slots.flatMap((s) => s.items).find((i) => i.id === el.dataset.id);
     const count = Math.max(0, Math.min(20, item.count + Number(el.dataset.delta)));
     save(() => setSupplement(el.dataset.id, { count }));
+  },
+  'supp-def-count': (el) => {
+    const s = state.data.supplements.find((x) => x.id === el.dataset.id);
+    const countPerDose = Math.max(1, Math.min(10, (s.countPerDose ?? 1) + Number(el.dataset.delta)));
+    if (countPerDose !== s.countPerDose) editSupplement(s.id, { countPerDose });
+  },
+  'supp-hide': (el) => {
+    const s = state.data.supplements.find((x) => x.id === el.dataset.id);
+    if (!window.confirm(`${s.name}을(를) 목록에서 뺄까요? 지난 복용 기록은 남아요.`)) return;
+    state.data.supplements = state.data.supplements.filter((x) => x.id !== s.id);
+    save(() => saveSupplementDef(state.fb, state.user.uid, s.id, { active: false }));
+  },
+  'supp-seed': () => {
+    const list = STARTER_SUPPLEMENTS.map((s) => ({ ...s }));
+    state.data.supplements = list.map((s) => ({ ...s, active: true }));
+    save(() => seedSupplements(state.fb, state.user.uid, list));
   },
   logout: () => state.fb.au.signOut(state.fb.auth),
 };
@@ -127,6 +159,22 @@ const changes = {
     const taken = !slot.done;
     save(() => Promise.all(slot.items.map((it) => setSupplement(it.id, { taken }))));
   },
+  'supp-edit': (el) => {
+    const s = state.data.supplements.find((x) => x.id === el.dataset.id);
+    const field = el.dataset.field;
+    const value = el.value.trim();
+    if (field === 'name') {
+      if (!value) { el.value = s.name; return; }
+      editSupplement(s.id, { name: value });
+    } else if (field === 'slot') {
+      // 알림 시각이 이전 시간대 기본값 그대로면 새 시간대 기본값으로 같이 바꾼다
+      const patch = { slot: value };
+      if (!s.time || s.time === SLOT_DEFAULT_TIME[s.slot]) patch.time = SLOT_DEFAULT_TIME[value];
+      editSupplement(s.id, patch);
+    } else if (field === 'time') {
+      editSupplement(s.id, { time: value || null });
+    }
+  },
   bedtime: (el) => {
     state.data.settings.bedtime = el.value || null;
     save(() => saveSettings(state.fb, state.user.uid, { bedtime: el.value || null }));
@@ -144,9 +192,30 @@ view.addEventListener('change', (e) => {
 });
 
 view.addEventListener('submit', async (e) => {
-  if (e.target.dataset.submit !== 'login') return;
   e.preventDefault();
   const form = new FormData(e.target);
+
+  if (e.target.dataset.submit === 'supp-add') {
+    const name = String(form.get('name')).trim();
+    if (!name) return;
+    const slot = form.get('slot');
+    const list = state.data.supplements;
+    const s = {
+      id: newSupplementId(state.fb, state.user.uid),
+      name,
+      slot,
+      time: form.get('time') || SLOT_DEFAULT_TIME[slot],
+      countPerDose: Math.max(1, Math.min(10, Number(form.get('count')) || 1)),
+      order: list.reduce((m, x) => Math.max(m, x.order ?? 0), -1) + 1,
+      ingredients: null,
+    };
+    list.push({ ...s, active: true });
+    const { id, ...fields } = s;
+    save(() => saveSupplementDef(state.fb, state.user.uid, id, fields, true));
+    return;
+  }
+
+  if (e.target.dataset.submit !== 'login') return;
   state.busy = true;
   state.loginError = null;
   render();

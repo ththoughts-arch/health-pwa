@@ -62,6 +62,18 @@ export const SPORT_LABEL = { run: '러닝', trail: '트레일', swim: '수영', 
 
 export const SLOT_LABEL = { morning: '아침', lunch: '점심', evening: '저녁', bedtime: '자기 전' };
 export const SLOT_ORDER = ['morning', 'lunch', 'evening', 'bedtime'];
+export const SLOT_DEFAULT_TIME = { morning: '08:00', lunch: '12:30', evening: '18:30', bedtime: '23:00' };
+
+// 처음 시작용 목록 (CLAUDE.md 3장). 시간대·알 수는 시안 기준, 사용자가 수정
+export const STARTER_SUPPLEMENTS = [
+  { id: 'omega3', name: '오메가3', slot: 'morning', countPerDose: 2 },
+  { id: 'vitamin-c', name: '비타민C', slot: 'morning', countPerDose: 1 },
+  { id: 'multivitamin', name: '종합영양제', slot: 'morning', countPerDose: 1 },
+  { id: 'vitamin-d', name: '비타민D', slot: 'morning', countPerDose: 1 },
+  { id: 'probiotics', name: '프로바이오틱스', slot: 'lunch', countPerDose: 1 },
+  { id: 'curcumin', name: '커큐민', slot: 'lunch', countPerDose: 2 },
+  { id: 'magnesium', name: '마그네슘', slot: 'bedtime', countPerDose: 1 },
+].map((s, order) => ({ ...s, time: SLOT_DEFAULT_TIME[s.slot], order, ingredients: null }));
 
 // score.js 경고 코드 → 문장 (진단하지 않는다)
 export function warningText(w) {

@@ -77,7 +77,7 @@ function supplementBlock(data) {
   const { slots } = supplementSlots(data);
   if (!slots.length) {
     return `<div class="block"><div class="block-head"><span class="block-title">오늘 영양제</span></div>
-      <p class="sub">등록된 영양제가 없어요. 영양제 탭에서 목록을 등록할 수 있게 될 거예요.</p></div>`;
+      <a class="sub link-inline" href="#supplements-edit">등록된 영양제가 없어요. 목록 등록하기 →</a></div>`;
   }
   const done = slots.filter((s) => s.done).length;
   return `

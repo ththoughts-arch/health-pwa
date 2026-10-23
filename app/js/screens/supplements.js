@@ -9,8 +9,11 @@ export function renderSupplements({ data }) {
 
   const hero = `
     <section class="hero">
-      <span class="hero-date">SUPPLEMENTS · TODAY</span>
-      <span class="hero-caption">오늘 복용</span>
+      <div class="hero-top">
+        <span class="hero-date">SUPPLEMENTS · TODAY</span>
+        <a class="chip-btn" href="#supplements-edit">목록 편집</a>
+      </div>
+      <span class="hero-caption hero-caption-tight">오늘 복용</span>
       <div class="hero-row hero-row-tight">
         <span class="hero-big hero-big-md">${takenPills}</span>
         <span class="hero-total num">/ ${totalPills}알</span>
@@ -22,7 +25,8 @@ export function renderSupplements({ data }) {
       <div class="section">
         <div class="block">
           <span class="block-title">등록된 영양제가 없어요</span>
-          <p class="sub">영양제 목록 등록은 다음 업데이트(6단계)에서 추가돼요. 등록하면 여기서 시간대별로 체크하고 알 수를 조절할 수 있어요.</p>
+          <p class="sub">목록을 등록하면 여기서 시간대별로 체크하고 알 수를 조절할 수 있어요.</p>
+          <a class="primary-btn link-btn" href="#supplements-edit">영양제 등록하기</a>
         </div>
       </div>`;
   }
