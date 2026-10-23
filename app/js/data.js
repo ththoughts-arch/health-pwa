@@ -10,12 +10,13 @@ export async function loadAll(fb, uid) {
     collection(user, name), where('date', '>=', addDays(today, -days + 1)), orderBy('date'),
   ));
 
-  const [profile, days, activities, checkins, supplements] = await Promise.all([
+  const [profile, days, activities, checkins, supplements, strength] = await Promise.all([
     getDoc(user),
     since('days', 31),
     since('activities', 14),
     since('checkins', 28),
     getDocs(collection(user, 'supplements')),
+    since('strength', 28),
   ]);
 
   const byDate = (snap) => Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
@@ -29,7 +30,13 @@ export async function loadAll(fb, uid) {
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((s) => s.active !== false)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    strength: sortStrength(strength.docs.map((d) => ({ id: d.id, ...d.data() }))),
   };
+}
+
+// 헬스 기록: 최근 날짜 먼저
+export function sortStrength(list) {
+  return list.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function checkinRef(fb, uid, date) {
@@ -74,6 +81,26 @@ export async function seedSupplements(fb, uid, list) {
     batch.set(doc(supplementsCol(fb, uid), id), { ...s, active: true, createdAt: serverTimestamp() }, { merge: true });
   }
   await batch.commit();
+}
+
+// 헬스 수동 기록 (strength/{id})
+function strengthCol(fb, uid) {
+  return fb.fs.collection(fb.db, 'users', uid, 'strength');
+}
+
+export function newStrengthId(fb, uid) {
+  return fb.fs.doc(strengthCol(fb, uid)).id;
+}
+
+export async function saveStrength(fb, uid, id, entry, isNew) {
+  const { doc, setDoc, serverTimestamp } = fb.fs;
+  const data = isNew ? { ...entry, createdAt: serverTimestamp() } : { ...entry, updatedAt: serverTimestamp() };
+  await setDoc(doc(strengthCol(fb, uid), id), data, { merge: true });
+}
+
+export async function deleteStrength(fb, uid, id) {
+  const { doc, deleteDoc } = fb.fs;
+  await deleteDoc(doc(strengthCol(fb, uid), id));
 }
 
 export async function saveSettings(fb, uid, patch) {

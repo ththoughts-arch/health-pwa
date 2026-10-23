@@ -1,6 +1,7 @@
 import { SPORT_LABEL, duration, esc, hm, mmdd, warningText } from '../format.js';
 import { activitiesBetween, intensity, pickDisplayDay } from '../model.js';
 import { addDays } from '../score.js';
+import { exerciseSummary } from './strength.js';
 
 const FILTERS = [['all', '전체'], ['run', '러닝'], ['trail', '트레일'], ['swim', '수영'], ['strength', '헬스']];
 const COACH = { all: '종목 코치', run: '러닝 코치', trail: '트레일 코치', swim: '수영 코치', strength: '헬스 코치' };
@@ -18,7 +19,10 @@ export function renderExercise({ data, ui }) {
 
   return `
     <section class="hero">
-      <span class="hero-date">TRAINING · ${mmdd(from)}–${from.slice(5, 7) === data.today.slice(5, 7) ? data.today.slice(8) : mmdd(data.today)}</span>
+      <div class="hero-top">
+        <span class="hero-date">TRAINING · ${mmdd(from)}–${from.slice(5, 7) === data.today.slice(5, 7) ? data.today.slice(8) : mmdd(data.today)}</span>
+        <a class="chip-btn" href="#strength">+ 헬스 기록</a>
+      </div>
       <div class="hero-split">
         <div class="hero-col">
           <span class="hero-caption hero-caption-tight">최근 7일 운동 시간</span>
@@ -92,24 +96,53 @@ function feedback(data, ui, thisWeek, dist, secs) {
     </div>`;
 }
 
+// 가민 활동 + 헬스 수동 기록. 같은 날 가민 헬스 활동과 연결된 수동 기록은 한 줄로 합친다
 function recent(data, sport) {
-  const acts = activitiesBetween(data, addDays(data.today, -13), data.today, sport)
-    .sort((a, b) => (b.startLocal ?? b.date).localeCompare(a.startLocal ?? a.date))
-    .slice(0, 8);
-  if (!acts.length) return '<div class="block block-line"><span class="block-title">최근 기록</span><p class="sub">최근 2주 기록이 없어요.</p></div>';
+  const from = addDays(data.today, -13);
+  const acts = activitiesBetween(data, from, data.today, sport);
+  const logs = sport === 'all' || sport === 'strength' ? data.strength.filter((s) => s.date >= from) : [];
+  const linked = new Set(logs.map((l) => l.activityId).filter(Boolean));
+
+  const rows = [
+    ...acts.filter((a) => !linked.has(a.id)).map((a) => ({ key: a.startLocal ?? a.date, html: actRow(a) })),
+    ...logs.map((l) => {
+      const act = acts.find((a) => a.id === l.activityId);
+      return { key: act?.startLocal ?? `${l.date}T23:59`, html: strengthRow(l, act) };
+    }),
+  ].sort((a, b) => b.key.localeCompare(a.key)).slice(0, 8);
+
+  if (!rows.length) return '<div class="block block-line"><span class="block-title">최근 기록</span><p class="sub">최근 2주 기록이 없어요.</p></div>';
   return `
     <div class="block block-line">
       <span class="block-title">최근 기록</span>
-      ${acts.map((a) => `
-        <div class="act-row">
-          <span class="num act-date">${mmdd(a.date)}</span>
-          <span class="act-main">
-            <span class="act-title">${SPORT_LABEL[a.sport] ?? esc(a.rawType)}</span>
-            <span class="sub">${actMeta(a)}</span>
-          </span>
-          <span class="num act-big">${actBig(a)}</span>
-        </div>`).join('')}
+      ${rows.map((r) => r.html).join('')}
     </div>`;
+}
+
+function actRow(a) {
+  return `
+    <div class="act-row">
+      <span class="num act-date">${mmdd(a.date)}</span>
+      <span class="act-main">
+        <span class="act-title">${SPORT_LABEL[a.sport] ?? esc(a.rawType)}</span>
+        <span class="sub">${actMeta(a)}</span>
+      </span>
+      <span class="num act-big">${actBig(a)}</span>
+    </div>`;
+}
+
+function strengthRow(log, act) {
+  const ex = log.exercises ?? [];
+  const meta = ex.slice(0, 2).map(exerciseSummary).join(' · ') + (ex.length > 2 ? ` 외 ${ex.length - 2}` : '');
+  return `
+    <a class="act-row" href="#strength=${encodeURIComponent(log.id)}" aria-label="${mmdd(log.date)} 헬스 기록 수정">
+      <span class="num act-date">${mmdd(log.date)}</span>
+      <span class="act-main">
+        <span class="act-title">헬스${log.note ? ` · ${esc(log.note)}` : ''}</span>
+        <span class="sub">${esc(meta)}</span>
+      </span>
+      <span class="num act-big">${act?.movingSecs ? `${Math.round(act.movingSecs / 60)}′` : `${ex.length}종목`}</span>
+    </a>`;
 }
 
 function actMeta(a) {

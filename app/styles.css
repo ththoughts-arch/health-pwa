@@ -287,6 +287,19 @@ p { margin: 0; }
 .link-btn { display: flex; align-items: center; justify-content: center; margin-top: 12px; }
 .link-inline { display: block; padding: 6px 0; text-decoration: underline; text-underline-offset: 3px; }
 
+/* 헬스 기록 */
+.strength-form { padding-top: 4px; }
+.date-input { width: 160px; font-size: 16px; text-align: center; }
+.copy-btn { margin-top: 14px; text-align: left; line-height: 1.4; padding: 10px 16px; border-radius: 14px; }
+.ex-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ex-num { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ex-num .num-input { width: 100%; min-width: 0; font-size: 18px; text-align: center; padding: 0 6px; }
+.ex-num .sub { flex-shrink: 0; }
+.add-row-btn { margin-top: 12px; }
+.note-field { padding: 18px 0 14px; }
+.danger-btn { margin-top: 12px; color: var(--warn-text); border-color: #F2C9B4; }
+a.act-row { color: inherit; }
+
 /* 로그인·설정 폼 */
 .form { gap: 16px; padding-top: 28px; }
 .field { display: flex; flex-direction: column; gap: 6px; }

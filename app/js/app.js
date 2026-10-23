@@ -1,7 +1,8 @@
 import { setCondition, conditionFromScore } from './theme.js';
 import { initFirebase } from './firebase.js';
 import {
-  loadAll, newSupplementId, saveBodyBattery, saveSettings, saveSupplement, saveSupplementDef, seedSupplements,
+  deleteStrength, loadAll, newStrengthId, newSupplementId, saveBodyBattery, saveSettings, saveStrength,
+  saveSupplement, saveSupplementDef, seedSupplements, sortStrength,
 } from './data.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
@@ -12,6 +13,7 @@ import { renderExercise } from './screens/exercise.js';
 import { renderSupplements } from './screens/supplements.js';
 import { renderSettings } from './screens/settings.js';
 import { renderSupplementsEdit } from './screens/supplements-edit.js';
+import { renderStrength } from './screens/strength.js';
 
 const screens = {
   today: renderToday,
@@ -19,11 +21,12 @@ const screens = {
   exercise: renderExercise,
   supplements: renderSupplements,
   'supplements-edit': renderSupplementsEdit,
+  strength: renderStrength,
   settings: renderSettings,
 };
 
 // 하위 화면에서 켜 둘 하단 탭
-const TAB_OF = { 'supplements-edit': 'supplements' };
+const TAB_OF = { 'supplements-edit': 'supplements', strength: 'exercise' };
 
 const state = {
   fb: null,
@@ -38,9 +41,22 @@ const state = {
 const view = document.getElementById('view');
 const tabbar = document.querySelector('.tabbar');
 
+// '#strength=ID' → { name: 'strength', param: 'ID' }
 function route() {
-  const name = location.hash.slice(1);
-  return screens[name] ? name : 'today';
+  const [name, param] = location.hash.slice(1).split('=');
+  return screens[name] ? { name, param: param ? decodeURIComponent(param) : null } : { name: 'today', param: null };
+}
+
+const emptyExercise = () => ({ name: '', weightKg: null, sets: null, reps: null });
+
+// 헬스 기록 화면의 입력 중 상태. 같은 기록(또는 새 기록)이면 유지
+function ensureStrengthDraft(param) {
+  const key = param ?? 'new';
+  if (state.ui.strengthDraft?.key === key) return;
+  const log = param && state.data.strength.find((s) => s.id === param);
+  state.ui.strengthDraft = log
+    ? { key, id: log.id, date: log.date, note: log.note ?? '', exercises: log.exercises.map((e) => ({ ...e })) }
+    : { key, id: null, date: state.data.today, note: '', exercises: [emptyExercise()] };
 }
 
 function message(text) {
@@ -48,7 +64,7 @@ function message(text) {
 }
 
 function render() {
-  const name = route();
+  const { name, param } = route();
   tabbar.hidden = !state.user;
   tabbar.querySelectorAll('a').forEach((a) => {
     if (a.dataset.tab === (TAB_OF[name] ?? name)) a.setAttribute('aria-current', 'page');
@@ -64,6 +80,7 @@ function render() {
   }
   if (!state.data) { view.innerHTML = message(state.error ?? '불러오는 중…'); return; }
 
+  if (name === 'strength') ensureStrengthDraft(param);
   setCondition(conditionFromScore(pickDisplayDay(state.data)?.score?.total));
   view.innerHTML = screens[name](state)
     + (state.error ? `<p class="toast" role="alert">${state.error}</p>` : '');
@@ -141,8 +158,67 @@ const actions = {
     state.data.supplements = list.map((s) => ({ ...s, active: true }));
     save(() => seedSupplements(state.fb, state.user.uid, list));
   },
+  'strength-add-row': () => {
+    state.ui.strengthDraft.exercises.push(emptyExercise());
+    render();
+    const names = view.querySelectorAll('.edit-name');
+    names[names.length - 1]?.focus();
+  },
+  'strength-remove': (el) => {
+    state.ui.strengthDraft.exercises.splice(Number(el.dataset.i), 1);
+    render();
+  },
+  'strength-copy-last': () => {
+    const d = state.ui.strengthDraft;
+    const last = state.data.strength.find((s) => s.id !== d.id);
+    if (last) d.exercises = last.exercises.map((e) => ({ ...e }));
+    render();
+  },
+  'strength-delete': () => {
+    const d = state.ui.strengthDraft;
+    if (!window.confirm('이 헬스 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
+    state.data.strength = state.data.strength.filter((s) => s.id !== d.id);
+    state.ui.strengthDraft = null;
+    location.hash = '#exercise';
+    save(() => deleteStrength(state.fb, state.user.uid, d.id));
+  },
   logout: () => state.fb.au.signOut(state.fb.auth),
 };
+
+// 다시 그리지 않고 입력 중 상태만 갱신 (포커스 유지)
+const inputs = {
+  'strength-date': (el) => { state.ui.strengthDraft.date = el.value; },
+  'strength-note': (el) => { state.ui.strengthDraft.note = el.value; },
+  'strength-ex': (el) => {
+    const ex = state.ui.strengthDraft.exercises[Number(el.dataset.i)];
+    const field = el.dataset.field;
+    ex[field] = field === 'name' ? el.value : el.value === '' ? null : Number(el.value);
+  },
+};
+
+function submitStrength() {
+  const d = state.ui.strengthDraft;
+  const num = (v, int) => {
+    if (v == null || !Number.isFinite(v) || v <= 0) return null;
+    return int ? Math.round(v) : Math.round(v * 2) / 2;
+  };
+  const exercises = d.exercises
+    .map((e) => ({ name: e.name.trim(), weightKg: num(e.weightKg, false), sets: num(e.sets, true), reps: num(e.reps, true) }))
+    .filter((e) => e.name);
+  if (!exercises.length) { window.alert('운동 이름을 하나 이상 적어 주세요.'); return; }
+  if (!d.date || d.date > state.data.today) { window.alert('날짜를 확인해 주세요.'); return; }
+
+  // 같은 날 가민 헬스 활동이 있으면 연결 (운동 탭에서 한 줄로 표시)
+  const act = state.data.activities.find((a) => a.date === d.date && a.sport === 'strength');
+  const entry = { date: d.date, exercises, note: d.note.trim(), activityId: act?.id ?? null };
+  const isNew = !d.id;
+  const id = d.id ?? newStrengthId(state.fb, state.user.uid);
+
+  state.data.strength = sortStrength([...state.data.strength.filter((s) => s.id !== id), { id, ...entry }]);
+  state.ui.strengthDraft = null;
+  location.hash = '#exercise';
+  save(() => saveStrength(state.fb, state.user.uid, id, entry, isNew));
+}
 
 const changes = {
   'body-battery': (el) => {
@@ -191,9 +267,19 @@ view.addEventListener('change', (e) => {
   if (el) changes[el.dataset.change]?.(el);
 });
 
+view.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-input]');
+  if (el) inputs[el.dataset.input]?.(el);
+});
+
 view.addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
+
+  if (e.target.dataset.submit === 'strength-save') {
+    submitStrength();
+    return;
+  }
 
   if (e.target.dataset.submit === 'supp-add') {
     const name = String(form.get('name')).trim();
