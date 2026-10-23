@@ -72,6 +72,11 @@ API 키·VAPID 키는 GitHub Secrets / 환경변수로만 관리하고 저장소
 - 최근 28일에 헬스(WeightTraining)·트레일(TrailRun) 기록 없음 → 종목 이름은 기록이 생기면 확정.
 - 강도 분포는 `icu_hr_zone_times` 사용. 존2 상한 140bpm과 `icu_hr_zones` 경계가 맞는지 확인 필요.
 
+**운영 메모 (2026-10-24)**
+- `sleepQuality`는 숫자가 클수록 나쁨 확인(수면 점수 55 → Q4, 67~76 → Q3). 앱 표시 1 아주 좋음 ~ 4 나쁨.
+- 가민 → intervals.icu 웰니스가 가끔 통째로 빠진다(10/23 수면 누락, HRV·심박은 있음). intervals.icu 웹에서 수기 입력은 안 됐고, **Garmin 연결 설정의 old data 다시 받기로 복구됨**. 복구 후 `Daily sync`를 수동 실행하면 반영.
+- 위험: 가민이 2026년 10월 파트너 약관을 바꿔 intervals.icu가 가민 출처 데이터를 API로 막을 수 있다는 포럼 글이 있음(미확정). Daily sync가 갑자기 빈 데이터를 받으면 이것부터 의심.
+
 ## 5. 기능 명세
 
 ### 5.1 수면
