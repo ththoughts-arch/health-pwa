@@ -119,7 +119,7 @@ API 키·VAPID 키는 GitHub Secrets / 환경변수로만 관리하고 저장소
 ## 8. 작업 순서 (체크리스트)
 
 - [ ] 0. 사용자가 intervals.icu 가입 + 가민 연결 + API 키 발급 (사용자 작업) — 가입·연결 완료, API 키 발급 남음
-- [ ] 1. 프로젝트 셋업: PWA 기본(매니페스트, 서비스 워커), 호스팅, 저장소 — 코드 완료. Firebase 프로젝트 `health-tracker-c4273` 연결·규칙 적용 확인됨. 남은 것: git 설치·GitHub 푸시·Pages 켜기, 승인된 도메인에 github.io 추가 (README 참고)
+- [x] 1. 프로젝트 셋업: PWA 기본(매니페스트, 서비스 워커), 호스팅, 저장소 — 저장소 `ththoughts-arch/health-pwa`, 배포 https://ththoughts-arch.github.io/health-pwa/ , Firebase `health-tracker-c4273`(규칙 적용·승인 도메인 추가 완료)
 - [ ] 2. intervals.icu 데이터 수집 스크립트 → 실제 웰니스/활동 응답 확인 → 사용 가능한 필드 확정(바디 배터리·수면 단계 여부 포함)
 - [ ] 3. 데이터 저장 구조 설계(일별 웰니스, 활동, 영양제 기록, 바디 배터리 입력, 점수)
 - [ ] 4. 컨디션 점수 계산 모듈(기준값 30일, 기준값 수집 기간 처리)
