@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>수면</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1A1B25;text-decoration:none}a:hover{color:#3A3C4A}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; color: #1A1B25">
+<div style="height: 772px; overflow-y: auto; display: flex; flex-direction: column">
+<div style="{{t.hero}}">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 0.06em; color: #3A3C4A">SLEEP · 00:41 → 07:53</span>
+<span style="font-size: 14px; font-weight: 500; color: #3A3C4A; margin-top: 22px">어젯밤 수면</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 92px; font-weight: 500; line-height: 0.9; letter-spacing: -0.04em; margin-top: 6px">7:12</span>
+<span style="font-size: 15px; line-height: 1.65; color: #24252F; margin-top: 16px">시간은 충분했지만 새벽 3시쯤 두 번 깼어요.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 8px 24px 28px">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+<sc-for list="{{metrics}}" as="m" hint-placeholder-count="6">
+<div style="{{m.cell}}">
+<span style="font-size: 12px; color: #5F6270">{{m.label}}</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 500">{{m.value}}</span>
+<span style="{{m.noteStyle}}">{{m.note}}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 26px 0 24px; border-bottom: 1px solid #ECEDF1">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-size: 15px; font-weight: 700">수면 시간 추이</span>
+<div role="group" aria-label="기간" style="display: flex; gap: 4px; background: #F3F4F7; border-radius: 18px; padding: 3px">
+<button onClick="{{pickWeek}}" style="{{weekStyle}}">1주</button>
+<button onClick="{{pickMonth}}" style="{{monthStyle}}">1개월</button>
+</div>
+</div>
+<div style="position: relative; height: 130px; display: flex; align-items: flex-end; gap: 12px">
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 101px; border-top: 1px dashed #B7BAC6"></div>
+<span style="position: absolute; right: 0; bottom: 105px; font-family: 'Space Grotesk', sans-serif; font-size: 11px; color: #5F6270">7h</span>
+<sc-for list="{{nights}}" as="n" hint-placeholder-count="7">
+<div style="flex: 1; display: flex; justify-content: center"><div style="{{n.bar}}"></div></div>
+</sc-for>
+</div>
+<div style="display: flex; gap: 12px">
+<sc-for list="{{nights}}" as="n" hint-placeholder-count="7">
+<span style="{{n.dayStyle}}">{{n.day}}</span>
+</sc-for>
+</div>
+<span style="font-size: 13px; color: #4A4D5A">평균 <span style="font-family: 'Space Grotesk', sans-serif; color: #1A1B25">6:34</span> · 목표보다 26분 부족</span>
+</div>
+
+<div style="display: flex; flex-direction: column; padding-top: 22px">
+<span style="font-size: 15px; font-weight: 700; padding-bottom: 6px">AI 분석</span>
+<div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-bottom: 1px solid #F0F1F5">
+<span style="font-size: 13px; font-weight: 700; {{t.accText}}">오늘</span>
+<span style="font-size: 14px; line-height: 1.65; color: #34363F">HRV가 평소보다 15% 낮아요. 깊은 회복이 부족했어요.</span>
+</div>
+<div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-bottom: 1px solid #F0F1F5">
+<span style="font-size: 13px; font-weight: 700; {{t.accText}}">패턴</span>
+<span style="font-size: 14px; line-height: 1.65; color: #34363F">7시간 30분 넘게 잔 다음 날 HRV가 평균 8ms 높았어요. 평일 취침을 30분 당겨 보세요.</span>
+</div>
+<div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 14px 0">
+<span style="font-size: 13px; font-weight: 700; color: #B4410A">주의</span>
+<span style="font-size: 14px; line-height: 1.65; color: #34363F">안정시 심박 3일 연속 상승. 과로나 감기 초기일 수 있어요. 일주일 넘게 이어지면 병원 확인을 권해요.</span>
+</div>
+</div>
+
+<div style="{{t.tonight}}">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 13px; font-weight: 600">오늘 밤 이때까지 잠들기</span>
+<span style="font-size: 12px; color: #3A3C4A">평소보다 30분 일찍 · 22:30 알림</span>
+</div>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.03em">23:30</span>
+</div>
+</div>
+</div>
+
+<nav aria-label="하단 메뉴" style="position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: rgba(255,255,255,0.96); border-top: 1px solid #ECEDF1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: 6px; box-sizing: border-box">
+<a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>오늘</a>
+<a href="Sleep.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #1A1B25; font-size: 13px; font-weight: 700"><span aria-hidden="true" style="{{t.dot}}"></span>수면</a>
+<a href="Exercise.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>운동</a>
+<a href="Supplements.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>영양제</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"condition":{"editor":"enum","options":["good","normal","low"],"default":"normal"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { range: 'week' };
+  }
+  renderVals() {
+    const themes = {
+      good: { g: 'linear-gradient(165deg, #FFF0B8 0%, #FFC9A3 48%, #FFA3C2 100%)', bar: 'linear-gradient(180deg, #FF8FB0, #FFC24D)', acc: '#B23E14' },
+      normal: { g: 'linear-gradient(165deg, #CFF6E6 0%, #B4DEFF 50%, #D3C4FF 100%)', bar: 'linear-gradient(180deg, #7C8CFF, #3FCB9B)', acc: '#2453C2' },
+      low: { g: 'linear-gradient(165deg, #EFEDFF 0%, #DCD5FF 50%, #F8DDF0 100%)', bar: 'linear-gradient(180deg, #E59BD0, #9C8CFF)', acc: '#5638BD' }
+    };
+    const th = themes[this.props.condition] || themes.normal;
+    const t = {
+      hero: 'background: ' + th.g + '; padding: 24px 24px 30px; border-radius: 0 0 32px 32px; display: flex; flex-direction: column',
+      tonight: 'display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding: 20px; border-radius: 20px; background: ' + th.g,
+      accText: 'color: ' + th.acc,
+      dot: 'width: 18px; height: 4px; border-radius: 2px; background: ' + th.bar
+    };
+    const m = [
+      ['수면 점수', '81', '평소 수준', false], ['HRV', '42ms', '−15%', true], ['안정시 심박', '54', '+6bpm', true],
+      ['산소포화도', '95%', '정상', false], ['호흡수', '14.2', '정상', false], ['깨어남', '2회', '평소 1회', true]
+    ];
+    const metrics = m.map(([label, value, note, warn], i) => ({
+      label, value, note,
+      noteStyle: 'font-size: 12px; ' + (warn ? 'color: #B4410A' : 'color: #6A6D7A'),
+      cell: 'display: flex; flex-direction: column; gap: 3px; padding: 16px 0 16px ' + (i % 3 === 0 ? '0' : '14px') + '; border-bottom: 1px solid #ECEDF1; ' + (i % 3 !== 2 ? 'border-right: 1px solid #ECEDF1;' : '')
+    }));
+    const data = [['금', 6.2], ['토', 7.8], ['일', 8.1], ['월', 5.6], ['화', 5.9], ['수', 5.2], ['목', 7.2]];
+    const nights = data.map(([day, h], i) => {
+      const last = i === data.length - 1;
+      return {
+        day,
+        bar: 'width: 12px; border-radius: 6px; height: ' + Math.round((h / 9) * 130) + 'px; background: ' + (last ? th.bar : (h < 7 ? '#E3E5EC' : '#C6CAD6')),
+        dayStyle: 'flex: 1; text-align: center; font-size: 12px; ' + (last ? 'color: #1A1B25; font-weight: 700' : 'color: #6A6D7A')
+      };
+    });
+    const btn = (on) => 'min-height: 30px; padding: 0 12px; border: none; border-radius: 15px; font-family: inherit; font-size: 12px; cursor: pointer; ' + (on ? 'background: #FFFFFF; color: #1A1B25; font-weight: 700; box-shadow: 0 1px 2px rgba(26,27,37,0.12)' : 'background: transparent; color: #5F6270');
+    return {
+      t, metrics, nights,
+      weekStyle: btn(this.state.range === 'week'),
+      monthStyle: btn(this.state.range === 'month'),
+      pickWeek: () => this.setState({ range: 'week' }),
+      pickMonth: () => this.setState({ range: 'month' })
+    };
+  }
+}
+</script>
+</body>
+</html>

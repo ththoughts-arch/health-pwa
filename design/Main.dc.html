@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>오늘</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1A1B25;text-decoration:none}a:hover{color:#3A3C4A}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; color: #1A1B25">
+<div style="height: 772px; overflow-y: auto; display: flex; flex-direction: column">
+<div style="{{t.hero}}">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 0.06em; color: #3A3C4A">FRI · 10.23</span>
+<button aria-label="설정" style="width: 40px; height: 40px; border: none; border-radius: 20px; background: rgba(255,255,255,0.55); display: flex; align-items: center; justify-content: center; cursor: pointer">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1B25" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"></path><circle cx="16" cy="7" r="2"></circle><circle cx="8" cy="17" r="2"></circle></svg>
+</button>
+</div>
+<span style="font-size: 14px; font-weight: 500; color: #3A3C4A; margin-top: 26px">오늘의 컨디션</span>
+<div style="display: flex; align-items: flex-end; gap: 12px; margin-top: 6px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 108px; font-weight: 500; line-height: 0.85; letter-spacing: -0.04em">{{t.score}}</span>
+<span style="font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 14px; background: rgba(255,255,255,0.7); margin-bottom: 6px">{{t.label}}</span>
+</div>
+<span style="font-size: 15px; line-height: 1.65; color: #24252F; margin-top: 18px">{{t.msg}}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 8px 24px 28px">
+<sc-if value="{{t.warn}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; gap: 12px; padding: 18px 0; border-bottom: 1px solid #ECEDF1">
+<span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #E8590C; margin-top: 7px; flex-shrink: 0"></span>
+<div style="display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 13px; font-weight: 700; color: #B4410A">회복 경고</span>
+<span style="font-size: 13px; line-height: 1.6; color: #4A4D5A">안정시 심박이 3일째 +6bpm, HRV는 낮은 상태예요. 고강도는 쉬어 주세요.</span>
+</div>
+</div>
+</sc-if>
+
+<div style="display: flex; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid #ECEDF1">
+<label for="bb" style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+<span style="font-size: 14px; font-weight: 600">가민 바디 배터리</span>
+<span style="font-size: 12px; color: #5F6270">{{bbNote}}</span>
+</label>
+<input id="bb" type="number" inputmode="numeric" min="0" max="100" placeholder="기상 직후" value="{{bb}}" onChange="{{setBB}}" style="width: 104px; min-height: 44px; box-sizing: border-box; border: 1px solid #DDDFE6; border-radius: 12px; padding: 0 12px; font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 500; color: #1A1B25; text-align: right; background: #FFFFFF">
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid #ECEDF1">
+<a href="Sleep.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 20px 16px 20px 0; border-right: 1px solid #ECEDF1">
+<span style="font-size: 12px; color: #5F6270">어젯밤 수면</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 500; letter-spacing: -0.02em">7:12</span>
+<span style="font-size: 12px; color: #5F6270">점수 81 · 두 번 깸</span>
+</a>
+<a href="Exercise.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 20px 0 20px 16px">
+<span style="font-size: 12px; color: #5F6270">오늘 권장 운동</span>
+<span style="font-size: 22px; font-weight: 700; letter-spacing: -0.01em; padding: 6px 0 4px; {{t.accText}}">{{t.plan}}</span>
+<span style="font-size: 12px; color: #5F6270">이번 주 4h 10m</span>
+</a>
+</div>
+
+<div style="display: flex; flex-direction: column; padding-top: 22px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px">
+<span style="font-size: 15px; font-weight: 700">오늘 영양제</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: #5F6270">{{doneCount}} / 3</span>
+</div>
+<div aria-hidden="true" style="height: 6px; border-radius: 3px; background: #F0F1F5; overflow: hidden; margin-bottom: 8px"><div style="{{progress}}"></div></div>
+<sc-for list="{{slots}}" as="s" hint-placeholder-count="3">
+<label style="display: flex; align-items: center; gap: 14px; min-height: 60px; border-top: 1px solid #F0F1F5; cursor: pointer">
+<input type="checkbox" checked="{{s.done}}" onChange="{{s.toggle}}" style="width: 22px; height: 22px; margin: 0; accent-color: #1A1B25">
+<span style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+<span style="{{s.labelStyle}}">{{s.label}}</span>
+<span style="font-size: 12px; color: #5F6270">{{s.items}}</span>
+</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: #5F6270">{{s.time}}</span>
+</label>
+</sc-for>
+</div>
+</div>
+</div>
+
+<nav aria-label="하단 메뉴" style="position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: rgba(255,255,255,0.96); border-top: 1px solid #ECEDF1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: 6px; box-sizing: border-box">
+<a href="Main.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #1A1B25; font-size: 13px; font-weight: 700"><span aria-hidden="true" style="{{t.dot}}"></span>오늘</a>
+<a href="Sleep.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>수면</a>
+<a href="Exercise.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>운동</a>
+<a href="Supplements.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>영양제</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"condition":{"editor":"enum","options":["good","normal","low"],"default":"normal"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { done: { am: true, pm: false, bed: false }, bb: '' };
+  }
+  renderVals() {
+    const themes = {
+      good: { score: 88, label: '좋음', g: 'linear-gradient(165deg, #FFF0B8 0%, #FFC9A3 48%, #FFA3C2 100%)', bar: 'linear-gradient(90deg, #FFC24D, #FF7FA6)', acc: '#B23E14', warn: false, plan: '템포런 OK', msg: '수면과 회복 모두 좋아요. 오늘은 계획한 운동을 그대로 해도 괜찮은 날이에요.' },
+      normal: { score: 72, label: '보통', g: 'linear-gradient(165deg, #CFF6E6 0%, #B4DEFF 50%, #D3C4FF 100%)', bar: 'linear-gradient(90deg, #3FCB9B, #6C8CFF)', acc: '#2453C2', warn: true, plan: '존2 · 30분', msg: '잠은 충분했지만 회복이 덜 됐어요. 가벼운 존2 러닝 30분이면 충분해요.' },
+      low: { score: 48, label: '회복 필요', g: 'linear-gradient(165deg, #EFEDFF 0%, #DCD5FF 50%, #F8DDF0 100%)', bar: 'linear-gradient(90deg, #9C8CFF, #E59BD0)', acc: '#5638BD', warn: true, plan: '오늘은 휴식', msg: '몸이 회복을 원하고 있어요. 오늘은 산책 정도만 하고 일찍 쉬어 주세요.' }
+    };
+    const th = themes[this.props.condition] || themes.normal;
+    const t = {
+      ...th,
+      hero: 'background: ' + th.g + '; padding: 24px 24px 30px; border-radius: 0 0 32px 32px; display: flex; flex-direction: column',
+      accText: 'color: ' + th.acc,
+      dot: 'width: 18px; height: 4px; border-radius: 2px; background: ' + th.bar
+    };
+    const base = [
+      { id: 'am', label: '아침', items: '오메가3 · 비타민C · 종합 · 비타민D', time: '08:00' },
+      { id: 'pm', label: '점심', items: '프로바이오틱스 · 커큐민', time: '12:30' },
+      { id: 'bed', label: '자기 전', items: '마그네슘', time: '23:00' }
+    ];
+    const done = this.state.done;
+    const slots = base.map((s) => ({
+      ...s,
+      done: !!done[s.id],
+      labelStyle: 'font-size: 15px; font-weight: 600; ' + (done[s.id] ? 'color: #8A8D99; text-decoration: line-through' : 'color: #1A1B25'),
+      toggle: () => this.setState({ done: { ...this.state.done, [s.id]: !this.state.done[s.id] } })
+    }));
+    const n = slots.filter((s) => s.done).length;
+    const bbNum = parseInt(this.state.bb, 10);
+    const bbNote = isNaN(bbNum) ? '수식 보정용 · 아침에 한 번 입력' : '내 점수 ' + th.score + ' · 차이 ' + (th.score - bbNum > 0 ? '+' : '') + (th.score - bbNum);
+    return { t, slots, doneCount: n, bb: this.state.bb, bbNote, setBB: (e) => this.setState({ bb: e.target.value }), progress: 'height: 100%; width: ' + Math.round(n / 3 * 100) + '%; background: ' + th.bar + '; border-radius: 3px' };
+  }
+}
+</script>
+</body>
+</html>

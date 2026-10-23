@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// 모든 데이터는 users/{uid}/ 아래에 둔다 → 본인만 읽고 쓴다.
+// 지금은 개인용이지만, 이 구조면 나중에 다중 사용자로 그대로 확장 가능.
+// GitHub Actions는 서비스 계정(Admin SDK)으로 쓰므로 이 규칙과 무관하게 기록된다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

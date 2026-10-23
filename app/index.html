@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>건강 트래커</title>
+<meta name="theme-color" content="#CFF6E6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="건강">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-condition="normal">
+<main id="view" class="view" tabindex="-1"></main>
+
+<nav class="tabbar" aria-label="하단 메뉴">
+  <a href="#today" data-tab="today"><span class="tab-dot" aria-hidden="true"></span>오늘</a>
+  <a href="#sleep" data-tab="sleep"><span class="tab-dot" aria-hidden="true"></span>수면</a>
+  <a href="#exercise" data-tab="exercise"><span class="tab-dot" aria-hidden="true"></span>운동</a>
+  <a href="#supplements" data-tab="supplements"><span class="tab-dot" aria-hidden="true"></span>영양제</a>
+</nav>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

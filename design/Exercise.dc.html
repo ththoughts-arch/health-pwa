@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>운동</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1A1B25;text-decoration:none}a:hover{color:#3A3C4A}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; color: #1A1B25">
+<div style="height: 772px; overflow-y: auto; display: flex; flex-direction: column">
+<div style="{{t.hero}}">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 0.06em; color: #3A3C4A">TRAINING · 10.17–23</span>
+<button style="min-height: 36px; padding: 0 14px; border: none; border-radius: 18px; background: rgba(255,255,255,0.7); color: #1A1B25; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer">+ 헬스 기록</button>
+</div>
+<div style="display: flex; align-items: flex-end; justify-content: space-between; margin-top: 22px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 500; color: #3A3C4A">이번 주 운동 시간</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 80px; font-weight: 500; line-height: 0.9; letter-spacing: -0.04em">4:10</span>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding-bottom: 6px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: #A8380A">+18%</span>
+<span style="font-size: 12px; color: #3A3C4A">지난주 대비 · 5회</span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 0 24px 28px">
+<div role="group" aria-label="종목" style="display: flex; gap: 8px; padding: 18px 0; overflow-x: auto">
+<sc-for list="{{sports}}" as="s" hint-placeholder-count="5">
+<button onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 16px 0 20px; border-top: 1px solid #ECEDF1">
+<div style="display: flex; justify-content: space-between">
+<span style="font-size: 13px; font-weight: 700">강도 분포</span>
+<span style="font-size: 12px; color: #5F6270">권장 쉬움 80%</span>
+</div>
+<div role="img" aria-label="쉬움 64%, 보통 21%, 고강도 15%" style="display: flex; gap: 3px; height: 10px">
+<div style="width: 64%; border-radius: 5px; {{t.barBg}}"></div>
+<div style="width: 21%; background: #C6CAD6; border-radius: 5px"></div>
+<div style="width: 15%; background: #F08A5D; border-radius: 5px"></div>
+</div>
+<div style="display: flex; justify-content: space-between; font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #4A4D5A">
+<span>쉬움 64</span><span>보통 21</span><span style="color: #B4410A">고강도 15</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; border-top: 1px solid #ECEDF1; padding-top: 4px">
+<div role="tablist" aria-label="피드백 관점" style="display: flex; gap: 22px; border-bottom: 1px solid #ECEDF1">
+<button role="tab" aria-selected="{{isHealth}}" onClick="{{showHealth}}" style="{{healthTab}}">건강 전문가</button>
+<button role="tab" aria-selected="{{isCoach}}" onClick="{{showCoach}}" style="{{coachTab}}">{{coachName}}</button>
+</div>
+<div style="display: flex; gap: 10px; padding: 16px 0 4px">
+<span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #E8590C; margin-top: 6px; flex-shrink: 0"></span>
+<span style="font-size: 13px; line-height: 1.55; color: #B4410A">회복 지표가 낮아, 오늘은 코치 추천보다 휴식이 먼저예요.</span>
+</div>
+<sc-if value="{{isHealth}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px 0 20px">
+<span style="font-size: 15px; line-height: 1.7; color: #34363F">주 150분 권장량은 충분히 넘었어요. 다만 고강도가 15%로 많아 회복이 따라가지 못하고 있어요.</span>
+<span style="font-size: 15px; line-height: 1.7; color: #34363F">남은 이번 주는 심박 140 이하 위주로, 하루는 완전히 쉬어 주세요.</span>
+</div>
+</sc-if>
+<sc-if value="{{isCoach}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px 0 20px">
+<span style="font-size: 15px; line-height: 1.7; color: #34363F">{{coachText1}}</span>
+<span style="font-size: 15px; line-height: 1.7; color: #34363F">{{coachText2}}</span>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; border-top: 1px solid #ECEDF1; padding-top: 20px">
+<span style="font-size: 15px; font-weight: 700; padding-bottom: 6px">최근 기록</span>
+<sc-for list="{{acts}}" as="a" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 58px; border-top: 1px solid #F0F1F5">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #6A6D7A">{{a.date}}</span>
+<span style="display: flex; flex-direction: column; gap: 1px">
+<span style="font-size: 14px; font-weight: 600">{{a.title}}</span>
+<span style="font-size: 12px; color: #6A6D7A">{{a.meta}}</span>
+</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 500">{{a.big}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<nav aria-label="하단 메뉴" style="position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: rgba(255,255,255,0.96); border-top: 1px solid #ECEDF1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: 6px; box-sizing: border-box">
+<a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>오늘</a>
+<a href="Sleep.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>수면</a>
+<a href="Exercise.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #1A1B25; font-size: 13px; font-weight: 700"><span aria-hidden="true" style="{{t.dot}}"></span>운동</a>
+<a href="Supplements.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>영양제</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"condition":{"editor":"enum","options":["good","normal","low"],"default":"normal"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sport: 'all', mode: 'health' };
+  }
+  renderVals() {
+    const themes = {
+      good: { g: 'linear-gradient(165deg, #FFF0B8 0%, #FFC9A3 48%, #FFA3C2 100%)', bar: 'linear-gradient(90deg, #FFC24D, #FF7FA6)' },
+      normal: { g: 'linear-gradient(165deg, #CFF6E6 0%, #B4DEFF 50%, #D3C4FF 100%)', bar: 'linear-gradient(90deg, #3FCB9B, #6C8CFF)' },
+      low: { g: 'linear-gradient(165deg, #EFEDFF 0%, #DCD5FF 50%, #F8DDF0 100%)', bar: 'linear-gradient(90deg, #9C8CFF, #E59BD0)' }
+    };
+    const th = themes[this.props.condition] || themes.normal;
+    const t = {
+      hero: 'background: ' + th.g + '; padding: 24px 24px 30px; border-radius: 0 0 32px 32px; display: flex; flex-direction: column',
+      barBg: 'background: ' + th.bar,
+      dot: 'width: 18px; height: 4px; border-radius: 2px; background: ' + th.bar
+    };
+    const list = [
+      { id: 'all', label: '전체' }, { id: 'run', label: '러닝' }, { id: 'trail', label: '트레일' },
+      { id: 'swim', label: '수영' }, { id: 'gym', label: '헬스' }
+    ];
+    const coach = {
+      all: ['러닝 코치', '이번 주 러닝 거리가 지난주보다 18% 늘었어요. 주간 증가폭은 10% 안쪽이 안전해요.', '다음 주는 롱런 1회와 존2 2회로 구성하고, 인터벌은 한 주 쉬어요.'],
+      run: ['러닝 코치', '어제 10.2km, 평균 5:28. 후반 3km 심박 드리프트가 7%로 커요.', '유산소 베이스가 더 필요해요. 존2 50분을 주 2회 넣어 보세요.'],
+      trail: ['트레일 코치', '지난 트레일에서 내리막 케이던스가 크게 떨어졌어요.', '주 1회 계단 내리기나 런지로 허벅지 앞쪽을 보강해 보세요.'],
+      swim: ['수영 코치', '100m 평균 2:05, 후반으로 갈수록 스트로크 수가 늘어요.', '몸이 가라앉기 쉬우니 머리를 숙인 자세 연습을 늘려 보세요.'],
+      gym: ['헬스 코치', '이번 주 하체 기록이 없어요. 러닝과 균형을 맞춰야 해요.', '스쿼트와 루마니안 데드리프트 3세트씩, 러닝 없는 날에 넣어 보세요.']
+    };
+    const pill = (on) => 'min-height: 36px; padding: 0 16px; border-radius: 18px; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; ' + (on ? 'border: 1px solid #1A1B25; background: #1A1B25; color: #FFFFFF; font-weight: 700' : 'border: 1px solid #DDDFE6; background: #FFFFFF; color: #4A4D5A');
+    const tab = (on) => 'min-height: 44px; padding: 0; border: none; background: transparent; font-family: inherit; font-size: 14px; cursor: pointer; margin-bottom: -1px; ' + (on ? 'color: #1A1B25; font-weight: 700; border-bottom: 2px solid #1A1B25' : 'color: #6A6D7A; border-bottom: 2px solid transparent');
+    const c = coach[this.state.sport];
+    const isHealth = this.state.mode === 'health';
+    return {
+      t,
+      sports: list.map((s) => ({ ...s, style: pill(s.id === this.state.sport), pick: () => this.setState({ sport: s.id }) })),
+      isHealth, isCoach: !isHealth,
+      healthTab: tab(isHealth), coachTab: tab(!isHealth),
+      showHealth: () => this.setState({ mode: 'health' }),
+      showCoach: () => this.setState({ mode: 'coach' }),
+      coachName: c[0], coachText1: c[1], coachText2: c[2],
+      acts: [
+        { date: '10.22', title: '러닝', meta: '55:48 · 평균 148bpm', big: '10.2km' },
+        { date: '10.22', title: '수영', meta: '45분 · 100m 2:05', big: '1,200m' },
+        { date: '10.21', title: '헬스 · 상체', meta: '벤치 60kg 5×5', big: '52′' },
+        { date: '10.19', title: '트레일', meta: '2:31:10 · 상승 820m', big: '14km' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

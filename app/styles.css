@@ -1,0 +1,97 @@
+/* 공통 색 (CLAUDE.md 7장) */
+:root {
+  --ink: #1A1B25;
+  --ink-2: #3A3C4A;
+  --muted: #5F6270;
+  --line: #ECEDF1;
+  --line-soft: #F0F1F5;
+  --warn-dot: #E8590C;
+  --warn-text: #B4410A;
+  --font-num: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans KR', system-ui, sans-serif;
+  --tabbar-h: 72px;
+}
+
+/* 컨디션별 테마 — body[data-condition] 으로 전환 */
+body[data-condition="good"] {
+  --hero: linear-gradient(165deg, #FFF0B8 0%, #FFC9A3 48%, #FFA3C2 100%);
+  --accent-grad: linear-gradient(90deg, #FFC24D, #FF7FA6);
+  --accent-text: #B23E14;
+}
+body[data-condition="normal"] {
+  --hero: linear-gradient(165deg, #CFF6E6 0%, #B4DEFF 50%, #D3C4FF 100%);
+  --accent-grad: linear-gradient(90deg, #3FCB9B, #6C8CFF);
+  --accent-text: #2453C2;
+}
+body[data-condition="low"] {
+  --hero: linear-gradient(165deg, #EFEDFF 0%, #DCD5FF 50%, #F8DDF0 100%);
+  --accent-grad: linear-gradient(90deg, #9C8CFF, #E59BD0);
+  --accent-text: #5638BD;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #FFFFFF; }
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+a { color: var(--ink); text-decoration: none; }
+.num { font-family: var(--font-num); }
+
+.view {
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  outline: none;
+}
+
+/* 히어로: 그라데이션, 아래 모서리만 32px */
+.hero {
+  background: var(--hero);
+  padding: calc(24px + env(safe-area-inset-top)) 24px 30px;
+  border-radius: 0 0 32px 32px;
+  display: flex;
+  flex-direction: column;
+}
+.hero-top { display: flex; justify-content: space-between; align-items: center; }
+.hero-date { font-family: var(--font-num); font-size: 13px; letter-spacing: 0.06em; color: var(--ink-2); }
+.hero-caption { font-size: 14px; font-weight: 500; color: var(--ink-2); margin-top: 26px; }
+.hero-big {
+  font-family: var(--font-num);
+  font-size: 108px; font-weight: 500; line-height: 0.85; letter-spacing: -0.04em;
+}
+.hero-row { display: flex; align-items: flex-end; gap: 12px; margin-top: 6px; }
+.hero-pill {
+  font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 14px;
+  background: rgba(255,255,255,0.7); margin-bottom: 6px;
+}
+.hero-msg { font-size: 15px; line-height: 1.65; color: #24252F; margin-top: 18px; }
+
+.icon-btn {
+  width: 44px; height: 44px; border: none; border-radius: 22px;
+  background: rgba(255,255,255,0.55);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
+.section { padding: 8px 24px 28px; display: flex; flex-direction: column; }
+.row { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.muted { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+/* 하단 탭 */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,0.96);
+  border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.tabbar a {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  color: #6A6D7A; font-size: 13px; min-height: 44px;
+}
+.tab-dot { width: 18px; height: 4px; border-radius: 2px; }
+.tabbar a[aria-current="page"] { color: var(--ink); font-weight: 700; }
+.tabbar a[aria-current="page"] .tab-dot { background: var(--accent-grad); }

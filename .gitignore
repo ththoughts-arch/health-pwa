@@ -1,0 +1,16 @@
+# 비밀값 — 절대 커밋하지 않는다 (GitHub Secrets 사용)
+.env
+.env.*
+*service-account*.json
+*-firebase-adminsdk-*.json
+
+# 수집한 건강 데이터 원본(2단계 응답 확인용) — 공개 저장소에 올리지 않는다
+data/
+samples/
+
+# 로컬 도구 설정
+.claude/
+
+node_modules/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>영양제</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1A1B25;text-decoration:none}a:hover{color:#3A3C4A}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; color: #1A1B25">
+<div style="height: 772px; overflow-y: auto; display: flex; flex-direction: column">
+<div style="{{t.hero}}">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 0.06em; color: #3A3C4A">SUPPLEMENTS · TODAY</span>
+<button style="min-height: 36px; padding: 0 14px; border: none; border-radius: 18px; background: rgba(255,255,255,0.7); color: #1A1B25; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer">성분표 찍기</button>
+</div>
+<span style="font-size: 14px; font-weight: 500; color: #3A3C4A; margin-top: 22px">오늘 복용</span>
+<div style="display: flex; align-items: flex-end; gap: 8px; margin-top: 6px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 92px; font-weight: 500; line-height: 0.9; letter-spacing: -0.04em">{{taken}}</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; color: #4A4D5A; padding-bottom: 4px">/ {{total}}알</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 4px 24px 28px">
+<sc-for list="{{slots}}" as="slot" hint-placeholder-count="3">
+<div style="{{slot.wrap}}">
+<div style="display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 4px">
+<span style="font-size: 15px; font-weight: 700">{{slot.label}} <span style="font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: #6A6D7A; margin-left: 6px">{{slot.time}}</span></span>
+<span style="{{slot.badge}}">{{slot.status}}</span>
+</div>
+<sc-for list="{{slot.items}}" as="it" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 48px">
+<button aria-label="{{it.aria}}" aria-pressed="{{it.done}}" onClick="{{it.toggle}}" style="{{it.check}}">
+<sc-if value="{{it.done}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+</button>
+<span style="{{it.nameStyle}}">{{it.name}}</span>
+<div style="display: flex; align-items: center; background: #F3F4F7; border-radius: 18px">
+<button aria-label="{{it.minusAria}}" onClick="{{it.minus}}" style="width: 36px; height: 36px; border: none; background: transparent; color: #4A4D5A; font-size: 17px; cursor: pointer">−</button>
+<span style="min-width: 20px; text-align: center; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700">{{it.count}}</span>
+<button aria-label="{{it.plusAria}}" onClick="{{it.plus}}" style="width: 36px; height: 36px; border: none; background: transparent; color: #4A4D5A; font-size: 17px; cursor: pointer">+</button>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-for>
+
+<div style="display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #ECEDF1; padding: 22px 0 24px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<span style="font-size: 15px; font-weight: 700">최근 4주</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 500">86<span style="font-size: 13px; color: #6A6D7A">%</span></span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px">
+<sc-for list="{{wk}}" as="d" hint-placeholder-count="7">
+<span style="text-align: center; font-size: 11px; color: #6A6D7A">{{d}}</span>
+</sc-for>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="28">
+<span role="img" aria-label="{{d.aria}}" style="{{d.style}}"></span>
+</sc-for>
+</div>
+</div>
+
+<div style="{{t.insight}}">
+<span style="font-size: 13px; font-weight: 700">AI가 찾은 패턴</span>
+<span style="font-size: 14px; line-height: 1.7; color: #24252F">자기 전 마그네슘을 먹은 날, 깊은 잠이 평균 18분 길었어요. 아직 4주치라 참고만 해 주세요.</span>
+</div>
+</div>
+</div>
+
+<nav aria-label="하단 메뉴" style="position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: rgba(255,255,255,0.96); border-top: 1px solid #ECEDF1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: 6px; box-sizing: border-box">
+<a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>오늘</a>
+<a href="Sleep.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>수면</a>
+<a href="Exercise.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #6A6D7A; font-size: 13px"><span aria-hidden="true" style="width: 18px; height: 4px"></span>운동</a>
+<a href="Supplements.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #1A1B25; font-size: 13px; font-weight: 700"><span aria-hidden="true" style="{{t.dot}}"></span>영양제</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"condition":{"editor":"enum","options":["good","normal","low"],"default":"normal"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      done: { omega: true, vc: true, multi: true, vd: true, pro: false, cur: false, mg: false },
+      count: { omega: 2, vc: 1, multi: 1, vd: 1, pro: 1, cur: 2, mg: 1 }
+    };
+  }
+  renderVals() {
+    const themes = {
+      good: { g: 'linear-gradient(165deg, #FFF0B8 0%, #FFC9A3 48%, #FFA3C2 100%)', bar: 'linear-gradient(90deg, #FFC24D, #FF7FA6)', solid: '#E56A3D', mid: '#FFD3B8' },
+      normal: { g: 'linear-gradient(165deg, #CFF6E6 0%, #B4DEFF 50%, #D3C4FF 100%)', bar: 'linear-gradient(90deg, #3FCB9B, #6C8CFF)', solid: '#4C6FE0', mid: '#BFD3FF' },
+      low: { g: 'linear-gradient(165deg, #EFEDFF 0%, #DCD5FF 50%, #F8DDF0 100%)', bar: 'linear-gradient(90deg, #9C8CFF, #E59BD0)', solid: '#7A5CE0', mid: '#D9CFFF' }
+    };
+    const th = themes[this.props.condition] || themes.normal;
+    const t = {
+      hero: 'background: ' + th.g + '; padding: 24px 24px 30px; border-radius: 0 0 32px 32px; display: flex; flex-direction: column',
+      insight: 'display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border-radius: 20px; background: ' + th.g,
+      dot: 'width: 18px; height: 4px; border-radius: 2px; background: ' + th.bar
+    };
+    const defs = [
+      { label: '아침', time: '08:00', items: [['omega', '오메가3'], ['vc', '비타민C'], ['multi', '종합영양제'], ['vd', '비타민D']] },
+      { label: '점심', time: '12:30', items: [['pro', '프로바이오틱스'], ['cur', '커큐민']] },
+      { label: '자기 전', time: '23:00', items: [['mg', '마그네슘']] }
+    ];
+    const st = this.state;
+    const setDone = (k) => this.setState({ done: { ...this.state.done, [k]: !this.state.done[k] } });
+    const setCount = (k, d) => this.setState({ count: { ...this.state.count, [k]: Math.max(0, this.state.count[k] + d) } });
+    let taken = 0, total = 0;
+    const slots = defs.map((s, si) => {
+      const items = s.items.map(([k, name]) => {
+        const done = !!st.done[k];
+        total += st.count[k];
+        if (done) taken += st.count[k];
+        return {
+          name, done, count: st.count[k],
+          aria: name + (done ? ' 복용함' : ' 복용 체크'),
+          minusAria: name + ' 한 알 줄이기', plusAria: name + ' 한 알 늘리기',
+          toggle: () => setDone(k), minus: () => setCount(k, -1), plus: () => setCount(k, 1),
+          nameStyle: 'flex: 1; font-size: 15px; ' + (done ? 'color: #8A8D99' : 'color: #1A1B25'),
+          check: 'width: 26px; height: 26px; border-radius: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; ' + (done ? 'border: none; background: ' + th.bar : 'border: 1.5px solid #C3C6D0; background: #FFFFFF')
+        };
+      });
+      const n = items.filter((i) => i.done).length;
+      const all = n === items.length;
+      return {
+        label: s.label, time: s.time, items,
+        wrap: 'display: flex; flex-direction: column; padding: 18px 0 8px; ' + (si > 0 ? 'border-top: 1px solid #ECEDF1' : ''),
+        status: all ? '완료' : n + ' / ' + items.length,
+        badge: 'font-size: 12px; font-weight: 700; ' + (all ? 'color: #1A1B25' : 'color: #6A6D7A')
+      };
+    });
+    const pattern = [2,2,1,2,2,0,2, 2,2,2,1,2,2,2, 1,2,2,2,2,0,2, 2,2,1,2,2,2,1];
+    const fills = ['#EEEFF3', th.mid, th.solid];
+    const words = ['안 먹음', '일부', '전부'];
+    const days = pattern.map((v, i) => ({ style: 'aspect-ratio: 1; border-radius: 6px; background: ' + fills[v], aria: (i + 1) + '일차 ' + words[v] }));
+    return { t, slots, taken, total, days, wk: ['금','토','일','월','화','수','목'] };
+  }
+}
+</script>
+</body>
+</html>
