@@ -84,12 +84,19 @@ for (const { id, ...a } of activities) {
 }
 
 const statusCount = {};
+const missing = [];
 let todayStatus = null;
 for (let i = RECOMPUTE_DAYS - 1; i >= 0; i--) {
   const date = addDays(today, -i);
   const day = summarizeDay({ date, wellnessByDate, activities, weights });
   statusCount[day.status] = (statusCount[day.status] ?? 0) + 1;
   if (date === today) todayStatus = day.status;
+  if (day.status === 'missing') {
+    // 날짜와 빠진 필드 이름만 (값은 출력하지 않음)
+    const w = wellnessByDate[date];
+    const empty = w ? ['sleepSecs', 'hrv', 'restingHR'].filter((k) => w[k] == null) : ['(행 없음)'];
+    missing.push(`${date}: ${empty.join(', ')}`);
+  }
   // merge: ai(8단계) 필드는 유지
   batch.set(user.collection('days').doc(date), { ...day, updatedAt: now }, { merge: true });
 }
@@ -97,5 +104,7 @@ for (let i = RECOMPUTE_DAYS - 1; i >= 0; i--) {
 await batch.commit();
 
 console.log(`웰니스 ${rawWellness.length}일, 활동 ${activities.length}건 수집`);
-console.log(`days ${RECOMPUTE_DAYS}일 기록: ${JSON.stringify(statusCount)}`);
-console.log(`오늘 상태: ${todayStatus}`);
+// JSON 중괄호는 Secrets 마스킹(서비스 계정 JSON의 '{' 줄)에 가려지므로 쓰지 않는다
+console.log(`days ${RECOMPUTE_DAYS}일 기록: ${Object.entries(statusCount).map(([k, n]) => `${k} ${n}`).join(', ')}`);
+console.log(`오늘(${today}) 상태: ${todayStatus}`);
+if (missing.length) console.log(`비어 있는 날:\n  ${missing.join('\n  ')}`);
