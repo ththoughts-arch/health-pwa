@@ -1,5 +1,5 @@
 // 앱 파일을 바꾸면 버전을 올린다 → 이전 캐시 삭제
-const VERSION = 'v5';
+const VERSION = 'v6';
 const CACHE = `health-${VERSION}`;
 const SHELL = [
   './',
@@ -26,8 +26,14 @@ const SHELL = [
   'icons/apple-touch-icon.png',
 ];
 
+// GitHub Pages는 max-age=600을 주므로, 브라우저 HTTP 캐시를 건너뛰고 서버에서 새로 받는다
+// (안 그러면 배포 후 최대 10분간 옛 파일이 새 캐시에 들어간다)
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -38,13 +44,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 같은 출처 파일: 네트워크 우선, 실패하면 캐시(오프라인).
+// 같은 출처 파일: 네트워크 우선(HTTP 캐시는 재검증), 실패하면 캐시(오프라인).
 // Firebase·폰트 등 외부 요청은 건드리지 않는다.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   event.respondWith(
-    fetch(req)
+    fetch(new Request(req.url, { cache: 'no-cache' }))
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(req, copy));

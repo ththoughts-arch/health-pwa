@@ -255,5 +255,21 @@ initFirebase()
   });
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch((e) => console.error('SW 등록 실패', e));
+  // 새 버전 서비스 워커가 자리 잡으면 한 번 새로고침 → 배포한 화면이 바로 보이게
+  // (처음 설치될 때는 이전 컨트롤러가 없으므로 새로고침하지 않음)
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then((reg) => {
+      // 홈 화면 앱은 오래 켜 두기도 하므로, 다시 볼 때마다 새 버전 확인
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    })
+    .catch((e) => console.error('SW 등록 실패', e));
 }
