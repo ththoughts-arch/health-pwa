@@ -52,18 +52,22 @@ users/{uid}                         프로필·설정            앱 쓰기
 
   // 점수 계산 시점의 내 기준값 (그날 점수를 나중에 다시 설명할 수 있게 함께 저장)
   baseline: {
-    days: 23,                  // 기준값에 쓰인 날 수 (14 미만이면 수집 중)
+    days: 23, ready: true,     // 기준값에 쓰인 날 수 (14 미만이면 수집 중)
     hrv30: 55.2, restingHR30: 49.8,
     sleepTargetSecs: 26400,    // 내 적정 수면 시간
     load7: 310, load28avg: 260,// 최근 7일 부하 / 지난 4주 주평균
+    loadRatio: 1.19, consecutiveHigh: false,
   },
 
-  // 컨디션 점수 (4단계 계산 모듈). baseline.days < 14 이면 null
+  status: 'ok',                // 'collecting' 기준값 수집 중 | 'missing' 오늘 데이터 없음 | 'ok'
+
+  // 컨디션 점수 (app/js/score.js). status가 'ok'가 아니면 null
   score: {
     total: 72, sleep: 30, recovery: 27, load: 15,
     band: 'normal',            // 'good' | 'normal' | 'low' → 앱 테마
     weights: { sleep: 40, recovery: 40, load: 20 },  // 10단계 보정 후 바뀔 수 있음
     formulaVersion: 1,
+    detail: { sleepDuration: 0.8, sleepQuality: 0.7, hrv: 0.6, restingHR: 0.75, load: 0.75 },  // 항목별 0~1
   },
 
   // 경고 (정해진 규칙으로 감지, 문장은 AI)
