@@ -1,5 +1,5 @@
 import { BAND_LABEL, SLEEP_QUALITY, duration, esc, heroDate, hm, mmdd, warningText } from '../format.js';
-import { activitiesBetween, headline, pickDisplayDay, recommendedExercise, supplementSlots } from '../model.js';
+import { activitiesBetween, headline, pickDisplayDay, recommendedExercise, sleepLabel, supplementSlots } from '../model.js';
 import { addDays } from '../score.js';
 
 const GEAR = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1B25" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
@@ -58,7 +58,7 @@ export function renderToday({ data }) {
 
       <div class="split">
         <a href="#sleep" class="split-cell">
-          <span class="sub">어젯밤 수면</span>
+          <span class="sub">${sleepLabel(data, day)}</span>
           <span class="split-big num">${hm(w?.sleepSecs)}</span>
           <span class="sub">${sleepMeta}</span>
         </a>

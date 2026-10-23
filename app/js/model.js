@@ -2,9 +2,11 @@
 import { addDays } from './score.js';
 import { SLOT_LABEL, SLOT_ORDER } from './format.js';
 
-// 화면 기준일: 오늘 점수가 아직 없으면(잠들기 전·동기화 전) 어제 점수를 보여 준다
+// 화면 기준일: 오늘 점수가 아직 없으면(잠들기 전·동기화 전·수면 기록 누락) 최근 3일 중 점수가 있는 날.
+// 화면에는 "MM.DD 데이터 기준"으로 날짜를 함께 표시한다
+const DISPLAY_LOOKBACK_DAYS = 3;
 export function pickDisplayDay(data) {
-  const candidates = [data.today, addDays(data.today, -1)];
+  const candidates = Array.from({ length: DISPLAY_LOOKBACK_DAYS }, (_, i) => addDays(data.today, -i));
   for (const d of candidates) if (data.days[d]?.status === 'ok') return data.days[d];
   for (const d of candidates) if (data.days[d]) return data.days[d];
   return null;
@@ -35,6 +37,12 @@ export function headline(day) {
     }[weakest];
   }
   return '무난한 상태예요. 평소대로 지내도 좋아요.';
+}
+
+// 수면은 일어난 날짜에 기록된다 → 오늘 행이면 "어젯밤"
+export function sleepLabel(data, day) {
+  if (!day || day.date === data.today) return '어젯밤 수면';
+  return `${day.date.slice(5).replace('-', '.')} 아침까지 수면`;
 }
 
 export function recommendedExercise(day) {

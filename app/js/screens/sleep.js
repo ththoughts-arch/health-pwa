@@ -1,5 +1,5 @@
 import { SLEEP_QUALITY, esc, hm, mmdd, shiftTime, signed, warningText, weekdayKo } from '../format.js';
-import { dateRange, pickDisplayDay, tonightBedtime } from '../model.js';
+import { dateRange, pickDisplayDay, sleepLabel, tonightBedtime } from '../model.js';
 
 const CHART_H = 130;
 const CHART_MAX = 10 * 3600;   // 그래프 상단 = 10시간
@@ -43,7 +43,7 @@ export function renderSleep({ data, ui }) {
   return `
     <section class="hero">
       <span class="hero-date">SLEEP · ${day ? mmdd(day.date) : '—'}</span>
-      <span class="hero-caption">어젯밤 수면</span>
+      <span class="hero-caption">${sleepLabel(data, day)}</span>
       <span class="hero-big hero-big-md">${hm(w.sleepSecs)}</span>
       <span class="hero-msg">${heroLine}</span>
     </section>
