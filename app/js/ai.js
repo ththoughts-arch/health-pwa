@@ -7,47 +7,76 @@ const API = 'https://generativelanguage.googleapis.com/v1beta';
 
 export class GeminiError extends Error {
   constructor(status) {
-    super(status === 429 ? 'Gemini 무료 한도를 넘었어요. 잠시 후 다시 시도해 주세요.'
+    super(status === 429 ? 'Gemini 무료 한도를 넘었어요. 잠시 후 다시 동기화해 주세요.'
       : status === 400 || status === 401 || status === 403 ? 'Gemini API 키를 확인해 주세요.'
+      : BUSY.includes(status) ? 'Gemini 서버가 바빠요. 잠시 후 다시 동기화해 주세요.'
       : `Gemini 오류 (HTTP ${status})`);
     this.status = status;
   }
 }
 
-// 사용 가능한 모델 중 최신 일반 flash 모델 (모델 이름이 바뀌어도 동작하게 목록에서 고른다)
-let cachedModel = null;
-async function pickModel(key) {
-  if (cachedModel) return cachedModel;
+// 서버가 바쁠 때(일시적) → 기다렸다 재시도, 그래도 안 되면 다음 모델
+const BUSY = [500, 502, 503, 504];
+const RETRY_WAITS_MS = [1500, 4000];
+const MAX_MODELS = 3;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 후보 모델: 최신 일반 flash → flash-lite → 기타 flash (모델 이름이 바뀌어도 동작하게 목록에서 고른다)
+let cachedModels = null;
+async function candidateModels(key) {
+  if (cachedModels) return cachedModels;
   const res = await fetch(`${API}/models?pageSize=200`, { headers: { 'x-goog-api-key': key } });
   if (!res.ok) throw new GeminiError(res.status);
   const { models = [] } = await res.json();
   const names = models.filter((m) => m.supportedGenerationMethods?.includes('generateContent')).map((m) => m.name);
   const version = (n) => parseFloat(n.match(/gemini-([\d.]+)/)?.[1] ?? '0');
-  const stable = names.filter((n) => /^models\/gemini-[\d.]+-flash$/.test(n)).sort((a, b) => version(b) - version(a));
-  const pick = stable[0]
-    ?? names.find((n) => /flash/.test(n) && !/(lite|image|tts|audio|live|embedding)/.test(n))
-    ?? names[0];
-  if (!pick) throw new Error('사용할 수 있는 Gemini 모델이 없어요.');
-  cachedModel = pick;
-  return pick;
+  const byVersion = (re) => names.filter((n) => re.test(n)).sort((a, b) => version(b) - version(a));
+  const list = [...new Set([
+    ...byVersion(/^models\/gemini-[\d.]+-flash$/),
+    ...byVersion(/^models\/gemini-[\d.]+-flash-lite$/),
+    ...names.filter((n) => /flash/.test(n) && !/(image|tts|audio|live|embedding)/.test(n)),
+  ])].slice(0, MAX_MODELS);
+  if (!list.length) throw new Error('사용할 수 있는 Gemini 모델이 없어요.');
+  cachedModels = list;
+  return list;
+}
+
+async function callModel(key, model, body) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${API}/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body,
+    });
+    if (res.ok) return res.json();
+    if (!BUSY.includes(res.status) || attempt >= RETRY_WAITS_MS.length) throw new GeminiError(res.status);
+    await sleep(RETRY_WAITS_MS[attempt]);
+  }
 }
 
 async function generate(key, system, payload, schema) {
-  const model = await pickModel(key);
-  const res = await fetch(`${API}/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.5 },
-    }),
+  const models = await candidateModels(key);
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.5 },
   });
-  if (!res.ok) throw new GeminiError(res.status);
-  const json = await res.json();
-  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('');
-  if (!text) throw new Error('Gemini 응답이 비어 있어요.');
-  return { model: model.replace('models/', ''), result: JSON.parse(text) };
+  let lastError;
+  for (const model of models) {
+    try {
+      const json = await callModel(key, model, body);
+      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('');
+      if (!text) throw new Error('Gemini 응답이 비어 있어요.');
+      // 이번에 된 모델을 다음 호출 때 먼저 쓴다
+      cachedModels = [model, ...models.filter((m) => m !== model)];
+      return { model: model.replace('models/', ''), result: JSON.parse(text) };
+    } catch (e) {
+      lastError = e;
+      // 키 문제는 다른 모델로 바꿔도 같으니 바로 중단. 바쁨·한도 초과는 다음 모델로
+      if (!(e instanceof GeminiError) || !(BUSY.includes(e.status) || e.status === 429)) throw e;
+    }
+  }
+  throw lastError;
 }
 
 const str = { type: 'STRING' };
