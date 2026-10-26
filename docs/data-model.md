@@ -5,7 +5,7 @@
 ## 원칙
 
 - 모든 데이터는 `users/{uid}/` 아래. 개인용이지만 이 구조 그대로 다중 사용자 확장 가능.
-- **쓰는 주체별로 문서를 나눈다.** GitHub Actions(자동 수집·점수·AI)가 쓰는 문서와 앱(사용자 입력)이 쓰는 문서를 섞지 않는다 → 서로 덮어쓰지 않고, 보안 규칙으로 앱이 점수를 고칠 수 없게 막을 수 있다.
+- **수집 데이터와 사용자 입력을 문서로 나눈다.** 동기화(수집·점수·AI)가 쓰는 문서(`days`·`activities`·`coach`)와 사용자가 입력하는 문서(`checkins` 등)를 섞지 않아 서로 덮어쓰지 않는다. 2026-10-26부터 동기화는 앱의 버튼이 하므로(백업: Actions `Daily sync`) 수집 문서도 본인 쓰기 허용.
 - 날짜 문서 ID는 **한국 시간 기준 `YYYY-MM-DD`** (intervals.icu 웰니스 `id`와 같은 형식). 정렬·범위 조회가 문자열 비교로 된다.
 - 시각은 Firestore `Timestamp`. 시:분 설정값은 `"HH:MM"` 문자열.
 - 무료 한도(읽기 5만/일, 쓰기 2만/일, 1GB)에 비해 사용량이 아주 작다. 홈 화면 1회 ≈ 10회 읽기, 30일 그래프 ≈ 30회 읽기.
@@ -13,13 +13,34 @@
 ## 전체 구조
 
 ```
-users/{uid}                         프로필·설정            앱 쓰기
-  ├─ days/{YYYY-MM-DD}              웰니스·점수·AI 분석     Actions 쓰기 / 앱 읽기만
-  ├─ activities/{intervalsId}       운동 기록(가민)         Actions 쓰기 / 앱 읽기만
-  ├─ checkins/{YYYY-MM-DD}          바디 배터리·영양제 복용  앱 쓰기
-  ├─ supplements/{supplementId}     영양제 목록             앱 쓰기
-  ├─ strength/{autoId}              헬스 수동 기록           앱 쓰기
-  └─ pushSubscriptions/{hash}       웹 푸시 구독 (9단계)     앱 쓰기
+users/{uid}                         프로필·설정·lastSyncAt  앱
+  ├─ days/{YYYY-MM-DD}              웰니스·점수·수면 AI      동기화
+  ├─ activities/{intervalsId}       운동 기록(가민)         동기화
+  ├─ coach/exercise                 운동 AI 코칭(최신 1개)   동기화
+  ├─ private/keys                   intervals.icu·Gemini 키 앱 (설정)
+  ├─ checkins/{YYYY-MM-DD}          바디 배터리·영양제 복용  앱
+  ├─ supplements/{supplementId}     영양제 목록             앱
+  ├─ strength/{autoId}              헬스 수동 기록           앱
+  ├─ memos/{autoId}                 메모 (7-1단계, 예정)     앱
+  └─ pushSubscriptions/{hash}       웹 푸시 구독 (9단계)     앱
+```
+
+## private/keys — API 키 (설정 화면에서 입력, 본인만 읽기)
+
+```js
+{ intervalsApiKey: '…', intervalsAthleteId: 'i123456', geminiApiKey: '…' }
+```
+
+## coach/exercise — 운동 AI 코칭 (동기화 때 새 운동이 있거나 날짜가 바뀌면 갱신)
+
+```js
+{
+  date: '2026-10-26', model: 'gemini-…', key: '날짜|활동ID…',   // key가 같으면 다시 호출 안 함
+  warning: '',                                                  // 휴식이 먼저일 때만
+  health: '최근 7일 …',
+  coach: { all: '…', run: '…', trail: '', swim: '…', strength: '' },  // 기록 없는 종목은 빈 문자열
+  createdAt: Timestamp,
+}
 ```
 
 ## users/{uid} — 프로필·설정
@@ -36,7 +57,7 @@ users/{uid}                         프로필·설정            앱 쓰기
 }
 ```
 
-## days/{date} — 하루 요약 (Actions가 매일 아침 기록)
+## days/{date} — 하루 요약 (동기화 때 최근 35일 다시 계산, ai는 유지)
 
 ```js
 {
@@ -74,10 +95,11 @@ users/{uid}                         프로필·설정            앱 쓰기
   warnings: [ { code: 'rhr_up_hrv_down', days: 3 } ],
 
   // Gemini 결과 (8단계)
+  // Gemini 수면 분석 (app/js/ai.js). 운동 코칭은 coach/exercise
   ai: {
     headline: '잠은 충분했지만 회복이 덜 됐어요…',
-    sleep: { today: '…', pattern: '…', caution: '…' },
-    exercise: { health: '…', coach: '…' },
+    sleep: { today: '…', pattern: '…', caution: '', tonight: '…' },
+    sleepKey: '날짜|수면초|점수|HRV|심박|총점',   // 같으면 다시 호출 안 함
     model: 'gemini-…', createdAt: Timestamp,
   },
 
@@ -175,11 +197,11 @@ intervals.icu 활동 `id`를 문서 ID로 → 다시 수집해도 중복 없이 
 
 ## 쓰는 주체와 권한
 
-| 컬렉션 | 앱(로그인한 본인) | GitHub Actions |
+| 컬렉션 | 앱(로그인한 본인) | GitHub Actions (백업 수동 실행) |
 |---|---|---|
 | `users/{uid}` 문서 | 읽기·쓰기 | 읽기 |
-| `days`, `activities` | **읽기만** | 쓰기 (Admin SDK) |
-| `checkins`, `supplements`, `strength`, `pushSubscriptions` | 읽기·쓰기 | 읽기 |
+| `days`, `activities`, `coach` | 읽기·쓰기 (동기화 버튼) | 쓰기 (Admin SDK, ai는 건드리지 않음) |
+| `private`, `checkins`, `supplements`, `strength`, `memos`, `pushSubscriptions` | 읽기·쓰기 | — |
 
 Actions는 서비스 계정(Admin SDK)으로 접근하므로 보안 규칙을 거치지 않는다. 필요한 Secrets(4단계 이후 수집 스크립트에서 사용):
 - `FIREBASE_SERVICE_ACCOUNT` — 서비스 계정 키 JSON 전체

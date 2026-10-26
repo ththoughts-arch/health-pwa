@@ -268,6 +268,26 @@ p { margin: 0; }
 .cal-cell.level-1 { background: var(--accent-mid); }
 .cal-cell.level-2 { background: var(--accent-solid); }
 
+/* 동기화 버튼 · 상태 */
+.hero-actions { display: flex; align-items: center; gap: 8px; }
+.sync-btn {
+  min-width: 44px; height: 44px; padding: 0 13px; border: none; border-radius: 22px;
+  background: rgba(255,255,255,0.55); display: flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; font-size: 12px; font-weight: 600;
+}
+.sync-btn.is-busy svg { animation: spin 1s linear infinite; }
+.sync-btn:disabled { cursor: default; }
+.sync-step { white-space: nowrap; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sync-btn.is-busy svg { animation: none; } }
+.hero-sync { font-size: 12px; color: var(--ink-3); margin-top: 12px; }
+.hero-alert {
+  margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.75);
+  font-size: 13px; font-weight: 600; color: var(--warn-text);
+}
+.key-row { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.ai-meta { padding-top: 10px; }
+
 /* 영양제 목록 편집 */
 .chip-btn {
   min-height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(255,255,255,0.7);

@@ -1,12 +1,14 @@
 import { SLEEP_QUALITY, esc, hm, mmdd, shiftTime, signed, warningText, weekdayKo } from '../format.js';
 import { dateRange, pickDisplayDay, sleepLabel, tonightBedtime } from '../model.js';
+import { syncButton } from './common.js';
 
 const CHART_H = 130;
 const CHART_MAX = 10 * 3600;   // 그래프 상단 = 10시간
 const barH = (secs) => Math.round((Math.min(secs, CHART_MAX) / CHART_MAX) * CHART_H);
 const avg = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
-export function renderSleep({ data, ui }) {
+export function renderSleep(state) {
+  const { data, ui } = state;
   const day = pickDisplayDay(data);
   const w = day?.wellness ?? {};
   const b = day?.baseline ?? {};
@@ -42,8 +44,11 @@ export function renderSleep({ data, ui }) {
 
   return `
     <section class="hero">
-      <span class="hero-date">SLEEP · ${day ? mmdd(day.date) : '—'}</span>
-      <span class="hero-caption">${sleepLabel(data, day)}</span>
+      <div class="hero-top">
+        <span class="hero-date">SLEEP · ${day ? mmdd(day.date) : '—'}</span>
+        ${syncButton(state)}
+      </div>
+      <span class="hero-caption hero-caption-tight">${sleepLabel(data, day)}</span>
       <span class="hero-big hero-big-md">${hm(w.sleepSecs)}</span>
       <span class="hero-msg">${heroLine}</span>
     </section>
@@ -107,9 +112,10 @@ function analysis(day) {
   const rows = [];
   if (ai?.today) rows.push(['오늘', ai.today, false]);
   if (ai?.pattern) rows.push(['패턴', ai.pattern, false]);
+  if (ai?.tonight) rows.push(['오늘 밤', ai.tonight, false]);
   for (const w of day?.warnings ?? []) rows.push(['주의', warningText(w), true]);
   if (ai?.caution) rows.push(['주의', ai.caution, true]);
-  if (!ai) rows.unshift(['오늘', 'AI 분석은 준비 중이에요. 연결되면 매일 아침 여기에 보여 드려요.', false]);
+  if (!ai) rows.unshift(['오늘', '동기화하면 이 수면 기록으로 AI 분석을 보여 드려요. 설정에서 Gemini API 키가 필요해요.', false]);
   return `
     <div class="block">
       <span class="block-title">AI 분석</span>

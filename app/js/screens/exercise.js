@@ -2,11 +2,13 @@ import { SPORT_LABEL, duration, esc, hm, mmdd, warningText } from '../format.js'
 import { activitiesBetween, intensity, pickDisplayDay } from '../model.js';
 import { addDays } from '../score.js';
 import { exerciseSummary } from './strength.js';
+import { syncButton } from './common.js';
 
 const FILTERS = [['all', '전체'], ['run', '러닝'], ['trail', '트레일'], ['swim', '수영'], ['strength', '헬스']];
 const COACH = { all: '종목 코치', run: '러닝 코치', trail: '트레일 코치', swim: '수영 코치', strength: '헬스 코치' };
 
-export function renderExercise({ data, ui }) {
+export function renderExercise(state) {
+  const { data, ui } = state;
   const sport = ui.sport;
   const from = addDays(data.today, -6);
   const thisWeek = activitiesBetween(data, from, data.today, sport);
@@ -21,7 +23,10 @@ export function renderExercise({ data, ui }) {
     <section class="hero">
       <div class="hero-top">
         <span class="hero-date">TRAINING · ${mmdd(from)}–${from.slice(5, 7) === data.today.slice(5, 7) ? data.today.slice(8) : mmdd(data.today)}</span>
-        <a class="chip-btn" href="#strength">+ 헬스 기록</a>
+        <div class="hero-actions">
+          <a class="chip-btn" href="#strength">+ 헬스 기록</a>
+          ${syncButton(state)}
+        </div>
       </div>
       <div class="hero-split">
         <div class="hero-col">
@@ -63,8 +68,11 @@ export function renderExercise({ data, ui }) {
 function feedback(data, ui, thisWeek, dist, secs) {
   const day = pickDisplayDay(data);
   const health = ui.feedback !== 'coach';
-  const warn = day?.score?.band === 'low' || (day?.warnings?.length ?? 0) > 0;
-  const ai = day?.ai?.exercise;
+  const ai = data.exerciseCoach;   // coach/exercise (Gemini, 동기화 때 갱신)
+  // 건강 경고를 코치 추천보다 먼저 (AI 경고 → 규칙 경고 순)
+  const warnText = ai?.warning
+    || (day?.warnings?.[0] ? warningText(day.warnings[0]) : null)
+    || (day?.score?.band === 'low' ? '회복 지표가 낮아, 오늘은 코치 추천보다 휴식이 먼저예요.' : null);
 
   let lines;
   if (health) {
@@ -81,7 +89,9 @@ function feedback(data, ui, thisWeek, dist, secs) {
       }
     }
   } else {
-    lines = [ai?.coach ?? `${COACH[ui.sport]} 피드백은 AI 분석이 연결되면 기록을 보고 보여 드려요.`];
+    lines = [ai?.coach?.[ui.sport]
+      || (ai ? `최근 4주 ${FILTERS.find(([id]) => id === ui.sport)[1]} 기록이 없어 코치 의견이 없어요.`
+        : '동기화하면 기록을 보고 AI 코치 의견을 보여 드려요. 설정에서 Gemini API 키가 필요해요.')];
   }
 
   return `
@@ -90,9 +100,10 @@ function feedback(data, ui, thisWeek, dist, secs) {
         <button type="button" role="tab" class="tab" data-action="feedback" data-mode="health" aria-selected="${health}">건강 전문가</button>
         <button type="button" role="tab" class="tab" data-action="feedback" data-mode="coach" aria-selected="${!health}">${COACH[ui.sport]}</button>
       </div>
-      ${warn ? `<div class="warn-inline"><span class="warn-dot" aria-hidden="true"></span>
-        <span class="warn-ink">${esc(day.warnings?.[0] ? warningText(day.warnings[0]) : '회복 지표가 낮아, 오늘은 코치 추천보다 휴식이 먼저예요.')}</span></div>` : ''}
+      ${warnText ? `<div class="warn-inline"><span class="warn-dot" aria-hidden="true"></span>
+        <span class="warn-ink">${esc(warnText)}</span></div>` : ''}
       <div class="feedback-text">${lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>
+      ${ai?.date ? `<span class="sub ai-meta">${ai.date.slice(5).replace('-', '.')} 분석 · ${esc(ai.model ?? '')}</span>` : ''}
     </div>`;
 }
 

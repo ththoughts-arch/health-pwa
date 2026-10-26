@@ -27,12 +27,14 @@ Claude Code가 이 파일을 먼저 읽고 작업을 이어간다. 결정된 사
 |---|---|---|
 | 데이터 소스 | **intervals.icu API** | 가민 공식 API는 기업 승인 필요라 불가. 가민 → intervals.icu 자동 동기화를 이용. 개인 API 키(설정 화면에서 발급). |
 | 호스팅 | GitHub Pages 또는 Firebase Hosting 무료 | 정적 PWA |
-| 매일 데이터 수집·분석 | GitHub Actions 예약 실행(cron) | 매일 아침 수집 → 점수 계산 → AI 분석 → 결과 저장 → 푸시 발송 |
+| 데이터 수집·분석 | ~~GitHub Actions 예약 실행(cron)~~ → **앱의 동기화 버튼** (2026-10-26 변경) | 버튼 → intervals.icu 수집 → 점수 계산 → 저장 → 새 데이터면 Gemini 분석. Actions `Daily sync`는 수동 백업용만 남김. 푸시(9단계)는 예약 실행이 필요할 수 있음 → 그때 결정 |
 | 저장소 | Firebase Firestore 무료 플랜 또는 저장소 내 JSON | 개인용은 JSON도 충분 |
 | AI 분석 | **Google Gemini API 무료 플랜** | Claude API는 유료라 제외. 무료 플랜은 입력이 학습에 쓰일 수 있으므로 **이름 등 개인 정보 없이 수치만** 보낸다. 하루 호출 수를 최소화(하루 1~2회 요약). |
 | 알림 | 웹 푸시(VAPID, `web-push` 라이브러리) | iOS는 홈 화면에 설치한 PWA에서만 푸시 가능(iOS 16.4+) |
 
-API 키·VAPID 키는 GitHub Secrets / 환경변수로만 관리하고 저장소에 커밋하지 않는다.
+API 키·VAPID 키는 저장소에 커밋하지 않는다. GitHub Actions용은 GitHub Secrets, 앱의 동기화 버튼용(intervals.icu·Gemini 키)은 앱 설정에서 입력 → Firestore `users/{uid}/private/keys`(본인만 읽기)에 저장.
+
+**변경 (2026-10-26, 사용자 요청):** 정해진 시각 자동 동기화 대신 **앱의 동기화 버튼**. 이유: 동기화 시각 이후에 일어나면 그날 수면이 늦게 반영되고, 러닝 직후 분석을 볼 수 없어서. intervals.icu·Gemini 모두 브라우저에서 직접 호출 가능(CORS 확인). Gemini 키는 URL이 아니라 `x-goog-api-key` 헤더로 보낸다. 모델은 호출 때 모델 목록에서 최신 일반 flash를 고른다(`app/js/ai.js`).
 
 **확정 (2026-10-24):** 호스팅은 **GitHub Pages**(공개 저장소, `app/` 폴더를 Actions로 배포), 저장소는 **Firestore**. 저장소 내 JSON은 쓰지 않는다 — 무료 Pages는 공개 저장소라 건강 데이터가 공개되기 때문. 데이터는 `users/{uid}/` 아래에만 두고 본인만 접근(`firestore.rules`). 앱 로그인은 Firebase Auth 이메일/비밀번호(iOS 홈 화면 PWA에서 팝업·리다이렉트 로그인이 불안정해서). 빌드 도구 없이 바닐라 JS + Firebase CDN 모듈.
 
@@ -171,7 +173,8 @@ API 키·VAPID 키는 GitHub Secrets / 환경변수로만 관리하고 저장소
 - [x] 6. 영양제 등록·체크·알 수 기록 — 목록 편집 `#supplements-edit`(이름·시간대·알림 시각·1회 알 수, 변경 즉시 저장, 빼기 = `active:false`), 빈 목록이면 3장 영양제 7개로 시작 버튼. 체크·알 수는 `checkins/{date}.supplements.{id}`
 - [x] 7. 헬스 수동 기록 — 운동 탭 "+ 헬스 기록" → `#strength`(새 기록), `#strength=ID`(수정·삭제). 운동별 이름·kg·세트·회 + 메모, "지난 기록 그대로" 불러오기. 같은 날 가민 `strength` 활동이 있으면 `activityId`로 연결해 최근 기록에 한 줄로 표시(시간은 가민 값). 가민 헬스 type 이름(`WeightTraining` 추정)은 실제 기록이 생기면 확인
 - [ ] 7-1. **메모 탭** (2026-10-24 추가, 다음 작업) — 7장 화면 5번. 저장 위치 `users/{uid}/memos/{id}` 예정 → `firestore.rules`·`docs/data-model.md`에 추가하고, 사용자가 Firebase 콘솔에 규칙을 다시 게시해야 함. 7단계 헬스 기록은 휴대폰 실사용 확인 대기 중
-- [ ] 8. Gemini 분석(수면 평가·패턴·경고, 운동 두 모드) — 개인정보 제외, 하루 호출 최소화
+- [x] 7-2. **동기화 버튼** (2026-10-26) — 오늘·수면·운동 화면 히어로. `app/js/sync.js` + 공용 `app/js/intervals.js`(Actions 백업 스크립트도 같은 코드). 예약 실행 중단
+- [x] 8. Gemini 분석(수면 평가·패턴·경고, 운동 두 모드) — `app/js/ai.js`. 동기화 후 새 데이터가 있을 때만 호출(수면: 그날 수면·HRV·심박·점수가 바뀌면, 운동: 날짜가 바뀌거나 최근 14일 운동·헬스 기록이 바뀌면) → 동기화당 최대 2회. 결과: `days/{date}.ai`(headline·sleep), `coach/exercise`(warning·health·coach.{all,run,trail,swim,strength}). 보내는 것: 수치·종목·운동 이름·영양제 이름만(활동 제목·메모·계정 정보 제외). 남은 것: 영양제-수면 상관관계(4주 데이터 쌓인 뒤), 실사용하며 프롬프트 다듬기
 - [ ] 9. 웹 푸시: 아침 수면 분석, 영양제 시간, 취침 1시간 전
 - [ ] 10. 바디 배터리 비교 화면/로그 → 2~4주 후 비중 보정
 - [ ] 11. (후순위) 성분표 사진 인식, 배포용 intervals.icu OAuth 연결 버튼

@@ -1,9 +1,12 @@
 import { setCondition, conditionFromScore } from './theme.js';
 import { initFirebase } from './firebase.js';
 import {
-  deleteStrength, loadAll, newStrengthId, newSupplementId, saveBodyBattery, saveSettings, saveStrength,
+  deleteStrength, loadAll, newStrengthId, newSupplementId, saveBodyBattery, saveKeys, saveSettings, saveStrength,
   saveSupplement, saveSupplementDef, seedSupplements, sortStrength,
 } from './data.js';
+import { syncNow } from './sync.js';
+import { runCoaching } from './ai.js';
+import { IntervalsError } from './intervals.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
 import { renderLogin, loginErrorText } from './screens/login.js';
@@ -35,6 +38,7 @@ const state = {
   error: null,
   loginError: null,
   busy: false,
+  sync: { busy: false, step: null, message: null },
   ui: { sleepRange: 'week', sport: 'all', feedback: 'health' },
 };
 
@@ -82,8 +86,52 @@ function render() {
 
   if (name === 'strength') ensureStrengthDraft(param);
   setCondition(conditionFromScore(pickDisplayDay(state.data)?.score?.total));
+  const toast = state.error ?? state.sync.message;
   view.innerHTML = screens[name](state)
-    + (state.error ? `<p class="toast" role="alert">${state.error}</p>` : '');
+    + (toast ? `<p class="toast" role="status">${toast}</p>` : '');
+}
+
+// 동기화 버튼: intervals.icu → 점수 → 저장 → (새 데이터면) AI 코칭
+async function runSync() {
+  if (state.sync.busy) return;
+  const { keys } = state.data;
+  if (!keys.intervalsApiKey || !keys.intervalsAthleteId) {
+    window.alert('설정에서 intervals.icu API 키와 Athlete ID를 먼저 넣어 주세요.');
+    location.hash = '#settings';
+    return;
+  }
+  state.sync = { busy: true, step: '데이터 가져오는 중…', message: null };
+  render();
+  let message;
+  try {
+    await syncNow(state.fb, state.user.uid, { keys, settings: state.data.settings, today: state.data.today });
+    state.data = await loadAll(state.fb, state.user.uid);
+    message = '동기화했어요';
+    if (keys.geminiApiKey) {
+      try {
+        const { done } = await runCoaching(state.fb, state.user.uid, state.data, (step) => {
+          state.sync.step = step;
+          render();
+        });
+        if (done.length) message += ` · AI ${done.map((d) => (d === 'sleep' ? '수면 분석' : '운동 코칭')).join('·')} 새로 받음`;
+      } catch (e) {
+        console.error(e);
+        message += ` · AI 분석 실패: ${e.message}`;
+      }
+    } else {
+      message += ' · AI 분석은 설정에서 Gemini 키를 넣으면 시작돼요';
+    }
+  } catch (e) {
+    console.error(e);
+    message = e instanceof IntervalsError ? e.message
+      : e.code === 'permission-denied' ? 'Firebase 규칙을 다시 게시해야 해요 (설정 참고)'
+      : '동기화하지 못했어요. 네트워크를 확인해 주세요.';
+  }
+  state.sync = { busy: false, step: null, message };
+  render();
+  setTimeout(() => {
+    if (state.sync.message === message) { state.sync.message = null; render(); }
+  }, 5000);
 }
 
 async function refresh() {
@@ -182,6 +230,7 @@ const actions = {
     location.hash = '#exercise';
     save(() => deleteStrength(state.fb, state.user.uid, d.id));
   },
+  sync: () => runSync(),
   logout: () => state.fb.au.signOut(state.fb.auth),
 };
 
@@ -251,6 +300,13 @@ const changes = {
       editSupplement(s.id, { time: value || null });
     }
   },
+  key: (el) => {
+    const value = el.value.trim();
+    if (!value) return;
+    const field = el.dataset.field;
+    state.data.keys[field] = value;
+    save(() => saveKeys(state.fb, state.user.uid, { [field]: value }));
+  },
   bedtime: (el) => {
     state.data.settings.bedtime = el.value || null;
     save(() => saveSettings(state.fb, state.user.uid, { bedtime: el.value || null }));
@@ -318,7 +374,7 @@ window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); }
 
 // 앱으로 돌아올 때 날짜가 바뀌었거나 아침 동기화가 끝났을 수 있으니 다시 불러온다
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.user) refresh();
+  if (document.visibilityState === 'visible' && state.user && !state.sync.busy) refresh();
 });
 
 render();

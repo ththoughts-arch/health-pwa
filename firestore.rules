@@ -2,7 +2,7 @@ rules_version = '2';
 
 // 구조: docs/data-model.md
 // 모든 데이터는 users/{uid}/ 아래 → 본인만 접근. 이 구조면 나중에 다중 사용자로 그대로 확장 가능.
-// GitHub Actions는 서비스 계정(Admin SDK)으로 쓰므로 이 규칙과 무관하게 기록된다.
+// 2026-10-26: 앱의 동기화 버튼이 직접 수집·저장하므로 days·activities도 본인 쓰기 허용.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner(uid) {
@@ -12,15 +12,12 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if isOwner(uid);
 
-      // Actions가 쓰는 데이터: 앱은 읽기만
       match /days/{date} {
-        allow read: if isOwner(uid);
+        allow read, write: if isOwner(uid);
       }
       match /activities/{activityId} {
-        allow read: if isOwner(uid);
+        allow read, write: if isOwner(uid);
       }
-
-      // 사용자가 직접 입력하는 데이터
       match /checkins/{date} {
         allow read, write: if isOwner(uid);
       }
@@ -28,6 +25,17 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
       match /strength/{entryId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /memos/{memoId} {
+        allow read, write: if isOwner(uid);
+      }
+      // AI 코칭 결과 (exercise 등)
+      match /coach/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+      // intervals.icu·Gemini API 키
+      match /private/{docId} {
         allow read, write: if isOwner(uid);
       }
       match /pushSubscriptions/{subId} {

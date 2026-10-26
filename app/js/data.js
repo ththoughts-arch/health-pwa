@@ -2,6 +2,14 @@
 import { addDays } from './score.js';
 import { localToday } from './format.js';
 
+// 권한 오류가 나도 화면 전체가 멈추지 않게 (규칙 재게시 전)
+function soft(promise) {
+  return promise.catch((e) => {
+    if (e.code !== 'permission-denied') throw e;
+    return { data: () => undefined, denied: true };
+  });
+}
+
 export async function loadAll(fb, uid) {
   const { doc, getDoc, collection, query, where, orderBy, getDocs } = fb.fs;
   const user = doc(fb.db, 'users', uid);
@@ -10,19 +18,26 @@ export async function loadAll(fb, uid) {
     collection(user, name), where('date', '>=', addDays(today, -days + 1)), orderBy('date'),
   ));
 
-  const [profile, days, activities, checkins, supplements, strength] = await Promise.all([
+  const [profile, days, activities, checkins, supplements, strength, keys, coach] = await Promise.all([
     getDoc(user),
     since('days', 31),
-    since('activities', 14),
+    since('activities', 28),
     since('checkins', 28),
     getDocs(collection(user, 'supplements')),
     since('strength', 28),
+    soft(getDoc(doc(user, 'private', 'keys'))),
+    soft(getDoc(doc(user, 'coach', 'exercise'))),
   ]);
 
   const byDate = (snap) => Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
   return {
     today,
     settings: profile.data()?.settings ?? {},
+    lastSyncAt: profile.data()?.lastSyncAt?.toDate?.() ?? null,
+    // 새 규칙(private·coach 경로)이 아직 게시되지 않았으면 true
+    rulesOutdated: !!(keys.denied || coach.denied),
+    keys: keys.data() ?? {},
+    exerciseCoach: coach.data() ?? null,
     days: byDate(days),
     activities: activities.docs.map((d) => ({ id: d.id, ...d.data() })),
     checkins: byDate(checkins),
@@ -101,6 +116,12 @@ export async function saveStrength(fb, uid, id, entry, isNew) {
 export async function deleteStrength(fb, uid, id) {
   const { doc, deleteDoc } = fb.fs;
   await deleteDoc(doc(strengthCol(fb, uid), id));
+}
+
+// API 키 (users/{uid}/private/keys, 본인만 읽기)
+export async function saveKeys(fb, uid, patch) {
+  const { doc, setDoc } = fb.fs;
+  await setDoc(doc(fb.db, 'users', uid, 'private', 'keys'), patch, { merge: true });
 }
 
 export async function saveSettings(fb, uid, patch) {

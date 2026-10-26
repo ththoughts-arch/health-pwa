@@ -1,5 +1,5 @@
 // 앱 파일을 바꾸면 버전을 올린다 → 이전 캐시 삭제
-const VERSION = 'v7';
+const VERSION = 'v8';
 const CACHE = `health-${VERSION}`;
 const SHELL = [
   './',
@@ -20,6 +20,10 @@ const SHELL = [
   'js/screens/settings.js',
   'js/screens/supplements-edit.js',
   'js/screens/strength.js',
+  'js/screens/common.js',
+  'js/intervals.js',
+  'js/sync.js',
+  'js/ai.js',
   'js/firebase.js',
   'js/firebase-config.js',
   'icons/icon.svg',

@@ -1,10 +1,12 @@
 import { BAND_LABEL, SLEEP_QUALITY, duration, esc, heroDate, hm, mmdd, warningText } from '../format.js';
 import { activitiesBetween, headline, pickDisplayDay, recommendedExercise, sleepLabel, supplementSlots } from '../model.js';
 import { addDays } from '../score.js';
+import { lastSyncText, syncButton } from './common.js';
 
 const GEAR = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1B25" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
 
-export function renderToday({ data }) {
+export function renderToday(state) {
+  const { data } = state;
   const day = pickDisplayDay(data);
   const score = day?.score;
   const pill = score ? BAND_LABEL[score.band]
@@ -34,14 +36,19 @@ export function renderToday({ data }) {
     <section class="hero">
       <div class="hero-top">
         <span class="hero-date">${heroDate(data.today)}</span>
-        <a class="icon-btn" href="#settings" aria-label="설정">${GEAR}</a>
+        <div class="hero-actions">
+          ${syncButton(state)}
+          <a class="icon-btn" href="#settings" aria-label="설정">${GEAR}</a>
+        </div>
       </div>
+      ${data.rulesOutdated ? '<a class="hero-alert" href="#settings">Firebase 규칙을 다시 게시해야 동기화·AI가 동작해요 →</a>' : ''}
       <span class="hero-caption">오늘의 컨디션 ${basedOn}</span>
       <div class="hero-row">
         <span class="hero-big">${score ? score.total : '—'}</span>
         <span class="hero-pill">${pill}</span>
       </div>
       <span class="hero-msg">${esc(headline(day))}</span>
+      <span class="hero-sync">${lastSyncText(data)}</span>
     </section>
 
     <div class="section">
