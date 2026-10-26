@@ -7,6 +7,13 @@ import { syncButton } from './common.js';
 const FILTERS = [['all', '전체'], ['run', '러닝'], ['trail', '트레일'], ['swim', '수영'], ['strength', '헬스']];
 const COACH = { all: '종목 코치', run: '러닝 코치', trail: '트레일 코치', swim: '수영 코치', strength: '헬스 코치' };
 
+// 초 → '02H 45M' (단위는 작게)
+function hoursMinutes(secs) {
+  const m = Math.round(secs / 60);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(m / 60))}<small>H</small> ${pad(m % 60)}<small>M</small>`;
+}
+
 export function renderExercise(state) {
   const { data, ui } = state;
   const sport = ui.sport;
@@ -22,16 +29,16 @@ export function renderExercise(state) {
   return `
     <section class="hero">
       <div class="hero-top">
-        <span class="hero-date">TRAINING · ${mmdd(from)}–${from.slice(5, 7) === data.today.slice(5, 7) ? data.today.slice(8) : mmdd(data.today)}</span>
+        <span class="hero-date">TRAINING</span>
         <div class="hero-actions">
           <a class="chip-btn" href="#strength">+ 헬스 기록</a>
-          ${syncButton(state)}
+          ${syncButton(state, 'exercise')}
         </div>
       </div>
       <div class="hero-split">
         <div class="hero-col">
           <span class="hero-caption hero-caption-tight">최근 7일 운동 시간</span>
-          <span class="hero-big hero-big-sm">${hm(now)}</span>
+          <span class="hero-big hero-hm">${hoursMinutes(now)}</span>
         </div>
         <div class="hero-side">
           <span class="hero-change num">${change == null ? '—' : `${change > 0 ? '+' : ''}${change}%`}</span>
@@ -130,16 +137,20 @@ function recent(data, sport) {
     </div>`;
 }
 
+// 러닝·트레일은 눌러서 상세 분석(#run=ID)으로
 function actRow(a) {
+  const run = a.sport === 'run' || a.sport === 'trail';
+  const tag = run ? 'a' : 'div';
+  const link = run ? ` href="#run=${encodeURIComponent(a.id)}" aria-label="${mmdd(a.date)} ${SPORT_LABEL[a.sport]} 상세 분석"` : '';
   return `
-    <div class="act-row">
+    <${tag} class="act-row"${link}>
       <span class="num act-date">${mmdd(a.date)}</span>
       <span class="act-main">
-        <span class="act-title">${SPORT_LABEL[a.sport] ?? esc(a.rawType)}</span>
+        <span class="act-title">${SPORT_LABEL[a.sport] ?? esc(a.rawType)}${run && a.ai ? ' <span class="ai-badge">AI</span>' : ''}</span>
         <span class="sub">${actMeta(a)}</span>
       </span>
-      <span class="num act-big">${actBig(a)}</span>
-    </div>`;
+      <span class="num act-big">${actBig(a)}${run ? ' <span class="chev" aria-hidden="true">›</span>' : ''}</span>
+    </${tag}>`;
 }
 
 function strengthRow(log, act) {

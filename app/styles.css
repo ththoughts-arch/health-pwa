@@ -89,6 +89,8 @@ p { margin: 0; }
 }
 .hero-big-md { font-size: 92px; line-height: 0.9; margin-top: 6px; }
 .hero-big-sm { font-size: 80px; line-height: 0.9; }
+.hero-hm { font-size: 64px; line-height: 0.9; white-space: nowrap; }
+.hero-hm small { font-size: 26px; font-weight: 500; letter-spacing: 0; margin-left: 2px; color: var(--ink-2); }
 .hero-row { display: flex; align-items: flex-end; gap: 12px; margin-top: 6px; }
 .hero-row-tight { gap: 8px; }
 .hero-pill {
@@ -289,6 +291,41 @@ p { margin: 0; }
 .ai-meta { padding-top: 10px; }
 .test-result { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--chip); word-break: break-word; }
 
+/* 러닝 상세 */
+.ai-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; vertical-align: 1px;
+  background: var(--accent-grad); color: #FFFFFF; font-family: var(--font-num); font-size: 10px; font-weight: 700;
+}
+.chev { color: var(--muted); margin-left: 2px; }
+.analyzing { padding: 12px 0; }
+.split-table { display: flex; flex-direction: column; margin-top: 6px; }
+.split-tr {
+  display: grid; grid-template-columns: 0.8fr 1fr 0.8fr 1fr 0.7fr; gap: 6px; align-items: center;
+  min-height: 34px; border-top: 1px solid var(--line-soft); font-size: 14px;
+}
+.split-tr > span:not(:first-child) { text-align: right; }
+.split-th { font-size: 12px; color: var(--muted); border-top: none; min-height: 28px; }
+.split-tr.is-best { color: var(--accent-text); font-weight: 700; }
+.split-tr.is-work { font-weight: 600; }
+
+/* 메모 */
+.memo-form { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; }
+.memo-kind { align-self: flex-start; }
+.memo-text { min-height: 0; padding: 12px 14px; line-height: 1.6; resize: vertical; }
+.memo-share { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.memo-share input { width: 22px; height: 22px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--ink); }
+.memo-share > span { display: flex; flex-direction: column; gap: 2px; }
+.memo-row { display: flex; flex-direction: column; gap: 6px; padding: 14px 0; border-top: 1px solid var(--line-soft); }
+.memo-meta { display: flex; align-items: center; gap: 8px; }
+.memo-tag { font-size: 12px; font-weight: 700; color: var(--muted-2); }
+.memo-tag.is-plan { color: var(--accent-text); }
+.memo-meta .ai-badge { margin-left: 0; }
+.memo-body {
+  font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.memo-empty { padding: 14px 0; }
+
 /* 영양제 목록 편집 */
 .chip-btn {
   min-height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(255,255,255,0.7);
@@ -355,7 +392,7 @@ a.act-row { color: inherit; }
   padding-bottom: calc(6px + env(safe-area-inset-bottom));
   background: rgba(255,255,255,0.96);
   border-top: 1px solid var(--line);
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .tabbar[hidden] { display: none; }
 .tabbar a {

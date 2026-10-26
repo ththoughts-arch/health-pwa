@@ -2,6 +2,8 @@
 import { addDays } from './score.js';
 import { localToday } from './format.js';
 
+const MEMO_LIMIT = 100;
+
 // 권한 오류가 나도 화면 전체가 멈추지 않게 (규칙 재게시 전)
 function soft(promise) {
   return promise.catch((e) => {
@@ -18,7 +20,7 @@ export async function loadAll(fb, uid) {
     collection(user, name), where('date', '>=', addDays(today, -days + 1)), orderBy('date'),
   ));
 
-  const [profile, days, activities, checkins, supplements, strength, keys, coach] = await Promise.all([
+  const [profile, days, activities, checkins, supplements, strength, keys, coach, memos] = await Promise.all([
     getDoc(user),
     since('days', 31),
     since('activities', 28),
@@ -27,6 +29,7 @@ export async function loadAll(fb, uid) {
     since('strength', 28),
     soft(getDoc(doc(user, 'private', 'keys'))),
     soft(getDoc(doc(user, 'coach', 'exercise'))),
+    soft(getDocs(query(collection(user, 'memos'), orderBy('createdAt', 'desc'), fb.fs.limit(MEMO_LIMIT)))),
   ]);
 
   const byDate = (snap) => Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
@@ -34,8 +37,9 @@ export async function loadAll(fb, uid) {
     today,
     settings: profile.data()?.settings ?? {},
     lastSyncAt: profile.data()?.lastSyncAt?.toDate?.() ?? null,
-    // 새 규칙(private·coach 경로)이 아직 게시되지 않았으면 true
-    rulesOutdated: !!(keys.denied || coach.denied),
+    // 새 규칙(private·coach·memos 경로)이 아직 게시되지 않았으면 true
+    rulesOutdated: !!(keys.denied || coach.denied || memos.denied),
+    memos: (memos.docs ?? []).map((d) => ({ id: d.id, ...d.data() })),
     keys: keys.data() ?? {},
     exerciseCoach: coach.data() ?? null,
     days: byDate(days),
@@ -116,6 +120,26 @@ export async function saveStrength(fb, uid, id, entry, isNew) {
 export async function deleteStrength(fb, uid, id) {
   const { doc, deleteDoc } = fb.fs;
   await deleteDoc(doc(strengthCol(fb, uid), id));
+}
+
+// 메모 (memos/{id}): { text, kind: 'plan' | 'idea', shareAI, date, createdAt, updatedAt }
+function memosCol(fb, uid) {
+  return fb.fs.collection(fb.db, 'users', uid, 'memos');
+}
+
+export function newMemoId(fb, uid) {
+  return fb.fs.doc(memosCol(fb, uid)).id;
+}
+
+export async function saveMemo(fb, uid, id, fields, isNew) {
+  const { doc, setDoc, serverTimestamp } = fb.fs;
+  const now = serverTimestamp();
+  await setDoc(doc(memosCol(fb, uid), id), isNew ? { ...fields, createdAt: now, updatedAt: now } : { ...fields, updatedAt: now }, { merge: true });
+}
+
+export async function deleteMemo(fb, uid, id) {
+  const { doc, deleteDoc } = fb.fs;
+  await deleteDoc(doc(memosCol(fb, uid), id));
 }
 
 // API 키 (users/{uid}/private/keys, 본인만 읽기)

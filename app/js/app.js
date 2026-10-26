@@ -1,12 +1,13 @@
 import { setCondition, conditionFromScore } from './theme.js';
 import { initFirebase } from './firebase.js';
 import {
-  deleteStrength, loadAll, newStrengthId, newSupplementId, saveBodyBattery, saveKeys, saveSettings, saveStrength,
-  saveSupplement, saveSupplementDef, seedSupplements, sortStrength,
+  deleteMemo, deleteStrength, loadAll, newMemoId, newStrengthId, newSupplementId, saveBodyBattery, saveKeys, saveMemo,
+  saveSettings, saveStrength, saveSupplement, saveSupplementDef, seedSupplements, sortStrength,
 } from './data.js';
 import { syncNow } from './sync.js';
-import { diagnoseGemini, runCoaching } from './ai.js';
-import { IntervalsError } from './intervals.js';
+import { analyzeRun, diagnoseGemini, runCoaching } from './ai.js';
+import { IntervalsError, fetchActivityDetail } from './intervals.js';
+import { summarizeLaps, summarizeStreams } from './run.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
 import { renderLogin, loginErrorText } from './screens/login.js';
@@ -17,19 +18,24 @@ import { renderSupplements } from './screens/supplements.js';
 import { renderSettings } from './screens/settings.js';
 import { renderSupplementsEdit } from './screens/supplements-edit.js';
 import { renderStrength } from './screens/strength.js';
+import { renderRun } from './screens/run.js';
+import { renderMemo } from './screens/memo.js';
 
+// 화면 함수는 (state, param) — param은 '#run=ID'의 ID 등
 const screens = {
   today: renderToday,
   sleep: renderSleep,
   exercise: renderExercise,
   supplements: renderSupplements,
+  memo: renderMemo,
   'supplements-edit': renderSupplementsEdit,
   strength: renderStrength,
+  run: renderRun,
   settings: renderSettings,
 };
 
 // 하위 화면에서 켜 둘 하단 탭
-const TAB_OF = { 'supplements-edit': 'supplements', strength: 'exercise' };
+const TAB_OF = { 'supplements-edit': 'supplements', strength: 'exercise', run: 'exercise' };
 
 const state = {
   fb: null,
@@ -39,7 +45,7 @@ const state = {
   loginError: null,
   busy: false,
   sync: { busy: false, ai: false, step: null, message: null },
-  ui: { sleepRange: 'week', sport: 'all', feedback: 'health' },
+  ui: { sleepRange: 'week', sport: 'all', feedback: 'health', runJobs: {}, memoFilter: 'all' },
 };
 
 const view = document.getElementById('view');
@@ -61,6 +67,39 @@ function ensureStrengthDraft(param) {
   state.ui.strengthDraft = log
     ? { key, id: log.id, date: log.date, note: log.note ?? '', exercises: log.exercises.map((e) => ({ ...e })) }
     : { key, id: null, date: state.data.today, note: '', exercises: [emptyExercise()] };
+}
+
+// 메모 입력 중 상태. 새 메모(key 'new')는 저장 전까지 유지, 수정은 해당 메모로 채움
+function ensureMemoDraft(param) {
+  const key = param ?? 'new';
+  if (state.ui.memoDraft?.key === key) return;
+  const m = param && state.data.memos.find((x) => x.id === param);
+  state.ui.memoDraft = m
+    ? { key, id: m.id, text: m.text ?? '', kind: m.kind ?? 'idea', shareAI: !!m.shareAI }
+    : { key, id: null, text: '', kind: 'plan', shareAI: true };
+}
+
+// 러닝 상세 화면을 열면, 아직 분석이 없을 때 한 번 자동으로: 랩·스트림 받기 → 계산 → Gemini → 저장
+async function maybeAnalyzeRun(id) {
+  const { data } = state;
+  const a = data.activities.find((x) => x.id === id);
+  if (!a || a.ai || state.ui.runJobs[id]) return;
+  if (!data.keys.geminiApiKey || !data.keys.intervalsApiKey) return;
+  state.ui.runJobs[id] = { busy: true };
+  render();
+  try {
+    let detail = a.detail;
+    if (!detail) {
+      const { intervals, streams } = await fetchActivityDetail({ apiKey: data.keys.intervalsApiKey }, id);
+      detail = { ...(summarizeStreams(streams) ?? {}), laps: summarizeLaps(intervals) };
+    }
+    await analyzeRun(state.fb, state.user.uid, data, a, detail);
+    state.ui.runJobs[id] = { done: true };
+  } catch (e) {
+    console.error(e);
+    state.ui.runJobs[id] = { error: `분석하지 못했어요: ${e.message}` };
+  }
+  if (state.data === data) render();
 }
 
 function message(text) {
@@ -85,10 +124,12 @@ function render() {
   if (!state.data) { view.innerHTML = message(state.error ?? '불러오는 중…'); return; }
 
   if (name === 'strength') ensureStrengthDraft(param);
+  if (name === 'memo') ensureMemoDraft(param);
   setCondition(conditionFromScore(pickDisplayDay(state.data)?.score?.total));
   const toast = state.error ?? state.sync.message;
-  view.innerHTML = screens[name](state)
+  view.innerHTML = screens[name](state, param)
     + (toast ? `<p class="toast" role="status">${toast}</p>` : '');
+  if (name === 'run' && param) maybeAnalyzeRun(param);
 }
 
 // 동기화 버튼: intervals.icu → 점수 → 저장 → 화면 갱신. 그다음 (새 데이터면) AI 코칭을 뒤에서 받아 채운다
@@ -123,8 +164,12 @@ async function runSync() {
   const data = state.data;
   let result;
   try {
-    result = await runCoaching(state.fb, state.user.uid, data, () => {
+    result = await runCoaching(state.fb, state.user.uid, data, (kind) => {
+      state.sync.pending = (state.sync.pending ?? []).filter((k) => k !== kind);
       if (state.data === data) render();
+    }, (kinds) => {
+      state.sync.pending = kinds;
+      render();
     });
   } catch (e) {
     result = { done: [], errors: [e.message], pending: 1 };
@@ -157,10 +202,14 @@ async function refresh() {
 }
 
 // 화면을 먼저 바꾸고(낙관적 업데이트) 저장. 실패하면 다시 불러온다
+// fn은 동기 부분에서 state를 바꾸고(예: setSupplement) 저장 Promise를 돌려준다.
+// 바뀐 state로 그리도록 fn을 먼저 실행한 뒤 render (반대로 하면 화면이 한 박자 늦게 보임)
 async function save(fn) {
+  let pending;
+  try { pending = fn(); } catch (e) { pending = Promise.reject(e); }
   render();
   try {
-    await fn();
+    await pending;
     state.error = null;
   } catch (e) {
     console.error(e);
@@ -242,6 +291,26 @@ const actions = {
     save(() => deleteStrength(state.fb, state.user.uid, d.id));
   },
   sync: () => runSync(),
+  'run-retry': (el) => {
+    delete state.ui.runJobs[el.dataset.id];
+    render();
+  },
+  'memo-kind': (el) => {
+    const d = state.ui.memoDraft;
+    // 새 메모에서 종류를 바꾸면 공유 기본값도 따라감 (계획은 공유, 아이디어는 비공유)
+    if (!d.id) d.shareAI = el.dataset.kind === 'plan';
+    d.kind = el.dataset.kind;
+    render();
+  },
+  'memo-filter': (el) => { state.ui.memoFilter = el.dataset.filter; render(); },
+  'memo-delete': () => {
+    const d = state.ui.memoDraft;
+    if (!window.confirm('이 메모를 삭제할까요? 되돌릴 수 없어요.')) return;
+    state.data.memos = state.data.memos.filter((m) => m.id !== d.id);
+    state.ui.memoDraft = null;
+    location.hash = '#memo';
+    save(() => deleteMemo(state.fb, state.user.uid, d.id));
+  },
   'ai-test': async () => {
     state.ui.aiTest = { busy: true };
     render();
@@ -259,6 +328,8 @@ const actions = {
 
 // 다시 그리지 않고 입력 중 상태만 갱신 (포커스 유지)
 const inputs = {
+  'memo-text': (el) => { state.ui.memoDraft.text = el.value; },
+  'memo-share': (el) => { state.ui.memoDraft.shareAI = el.checked; },
   'strength-date': (el) => { state.ui.strengthDraft.date = el.value; },
   'strength-note': (el) => { state.ui.strengthDraft.note = el.value; },
   'strength-ex': (el) => {
@@ -357,6 +428,24 @@ view.addEventListener('submit', async (e) => {
 
   if (e.target.dataset.submit === 'strength-save') {
     submitStrength();
+    return;
+  }
+
+  if (e.target.dataset.submit === 'memo-save') {
+    const d = state.ui.memoDraft;
+    const text = d.text.trim();
+    if (!text) return;
+    const fields = { text, kind: d.kind, shareAI: d.shareAI, date: state.data.today };
+    const isNew = !d.id;
+    const id = d.id ?? newMemoId(state.fb, state.user.uid);
+    const now = new Date();
+    state.data.memos = [
+      { id, ...fields, createdAt: isNew ? now : state.data.memos.find((m) => m.id === id)?.createdAt },
+      ...state.data.memos.filter((m) => m.id !== id),
+    ];
+    state.ui.memoDraft = null;
+    if (!isNew) location.hash = '#memo';
+    save(() => saveMemo(state.fb, state.user.uid, id, fields, isNew));
     return;
   }
 

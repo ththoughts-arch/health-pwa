@@ -1,5 +1,5 @@
 // 앱 파일을 바꾸면 버전을 올린다 → 이전 캐시 삭제
-const VERSION = 'v12';
+const VERSION = 'v14';
 const CACHE = `health-${VERSION}`;
 const SHELL = [
   './',
@@ -24,6 +24,9 @@ const SHELL = [
   'js/intervals.js',
   'js/sync.js',
   'js/ai.js',
+  'js/run.js',
+  'js/screens/run.js',
+  'js/screens/memo.js',
   'js/firebase.js',
   'js/firebase-config.js',
   'icons/icon.svg',

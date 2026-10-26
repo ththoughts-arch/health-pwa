@@ -205,7 +205,21 @@ const EXERCISE_SYSTEM = `너는 두 역할을 한다.${COMMON}
    - 해당 종목 기록이 없으면 그 종목은 빈 문자열.
 - warning: 회복 지표가 나쁘거나 부하가 급증해 코치 추천보다 휴식이 먼저일 때만 1문장, 없으면 빈 문자열. 건강 경고가 코치 추천과 충돌하면 코치 문장도 그에 맞춰 낮춘다.`;
 
+const RUN_SYSTEM = `너는 러닝 코치이자 건강 전문가다. 러닝 한 번을 아주 자세히 분석한다.${COMMON}
+- 입력: run(이번 러닝 요약), splits(1km 구간별 paceSecPerKm·심박·케이던스·상승, 마지막은 partialM 미터짜리 남은 구간일 수 있음), firstHalf/secondHalf(시간 기준 전반·후반), decouplingPct(같은 심박 대비 속도 저하율. 5% 미만이면 유산소 기반이 안정적), hrDriftBpm, laps(랩·인터벌), recentRuns(최근 같은 종목 기록), recovery(그날 회복 상태), zone2MaxHr, hrZoneUpperBpm(존별 상한 bpm), trainingPlanNotes(사용자가 공유한 훈련 계획 메모. 있으면 계획 대비로 평가).
+- 페이스는 초/km 값을 'm:ss/km'로 바꿔 말한다. 케이던스가 100 미만이면 한쪽 발 기준이므로 2배(분당 걸음 수)로 말한다.
+- 각 항목은 숫자를 근거로 2~4문장. 판단할 데이터가 없으면 빈 문자열.
+- summary: 어떤 성격의 훈련이었고 잘 됐는지 한눈에.
+- pacing: 구간별 페이스 흐름(일정했는지, 후반 빨라짐/느려짐, 언덕 영향).
+- heartRate: 존 분포와 존2 기준 강도 평가, 심박 드리프트·디커플링 해석.
+- form: 케이던스, 오르막·내리막 등 효율 관련.
+- intervals: 인터벌·랩 구성이 있었다면 반복별 일관성. 없으면 빈 문자열.
+- comparison: recentRuns와 비교해 좋아진 점·아쉬운 점(같은 심박에서의 페이스 등).
+- nextRun: 다음 러닝 구체 제안(종류, 거리·시간, 페이스 범위, 심박 범위). 회복 상태가 나쁘면 그에 맞춰 낮춘다.
+- caution: 부상·과훈련·건강 위험 신호가 있을 때만, 없으면 빈 문자열.`;
+
 const SLEEP_SCHEMA = objectOf(['headline', 'today', 'pattern', 'caution', 'tonight']);
+const RUN_SCHEMA = objectOf(['summary', 'pacing', 'heartRate', 'form', 'intervals', 'comparison', 'nextRun', 'caution']);
 const EXERCISE_SCHEMA = {
   type: 'OBJECT',
   properties: { warning: str, health: str, coach: objectOf(['all', 'run', 'trail', 'swim', 'strength']) },
@@ -304,7 +318,17 @@ function exercisePayload(data, day) {
       date: s.date,
       exercises: (s.exercises ?? []).map((e) => ({ name: e.name, kg: e.weightKg, sets: e.sets, reps: e.reps })),
     })),
+    trainingPlanNotes: sharedPlanNotes(data),
   });
+}
+
+// 사용자가 "AI 코치에 공유"한 훈련 계획 메모 (메모 탭). 이것만 Gemini로 간다
+const MAX_SHARED_MEMOS = 5;
+function sharedPlanNotes(data) {
+  return (data.memos ?? [])
+    .filter((m) => m.shareAI && m.text)
+    .slice(0, MAX_SHARED_MEMOS)
+    .map((m) => ({ date: m.date, kind: m.kind, text: m.text.slice(0, 500) }));
 }
 
 // 같은 입력이면 다시 부르지 않기 위한 키
@@ -319,12 +343,47 @@ function exerciseKey(data) {
   const ids = data.activities.filter((a) => a.date >= from).map((a) => a.id).sort();
   const logs = data.strength.filter((s) => s.date >= from).map((s) => `${s.id}:${(s.exercises ?? []).length}`).sort();
   if (!ids.length && !logs.length) return null;
-  return [data.today, ...ids, ...logs].join('|');
+  // 공유한 계획 메모가 바뀌어도 다시 코칭
+  const notes = sharedPlanNotes(data).map((n) => `${n.date}:${n.text.length}`);
+  return [data.today, ...ids, ...logs, ...notes].join('|');
+}
+
+// 러닝 한 번 상세 분석 → activities/{id}.ai, 계산한 스플릿 등은 .detail (다음에 열 때 다시 부르지 않음)
+export async function analyzeRun(fb, uid, data, activity, detail) {
+  const key = data.keys.geminiApiKey;
+  if (!key) throw new Error('설정에서 Gemini API 키를 넣어 주세요.');
+  const recentRuns = data.activities
+    .filter((a) => a.id !== activity.id && a.sport === activity.sport && a.date <= activity.date)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 6)
+    .map(activityForAI);
+  const payload = compact({
+    run: activityForAI(activity),
+    splits: detail.splits,
+    firstHalf: detail.firstHalf,
+    secondHalf: detail.secondHalf,
+    decouplingPct: detail.decouplingPct,
+    hrDriftBpm: detail.hrDriftBpm,
+    // 랩 이름(label)은 사용자가 붙인 글일 수 있어 보내지 않는다
+    laps: (detail.laps ?? []).map(({ label, ...l }) => l),
+    recentRuns,
+    recovery: recoveryForAI(data.days[activity.date] ?? pickDisplayDay(data)),
+    zone2MaxHr: data.settings.zone2MaxHr ?? 140,
+    hrZoneUpperBpm: activity.hrZones ?? null,
+    trainingPlanNotes: sharedPlanNotes(data),
+  });
+  const { model, result } = await generate(key, RUN_SYSTEM, payload, RUN_SCHEMA);
+  const ai = { ...result, model };
+  const { doc, setDoc, serverTimestamp } = fb.fs;
+  await setDoc(doc(fb.db, 'users', uid, 'activities', activity.id),
+    { ai: { ...ai, createdAt: serverTimestamp() }, detail }, { merge: true });
+  activity.ai = { ...ai, createdAt: new Date() };
+  activity.detail = detail;
 }
 
 // 동기화 후 실행. 새 데이터가 있을 때만, 수면·운동을 동시에 요청 (최대 2회).
 // 각각 끝나는 대로 data에 반영하고 onResult(kind)를 불러 화면을 바로 갱신하게 한다.
-export async function runCoaching(fb, uid, data, onResult = () => {}) {
+export async function runCoaching(fb, uid, data, onResult = () => {}, onStart = () => {}) {
   const key = data.keys.geminiApiKey;
   if (!key) return { done: [], errors: [], skipped: 'no-key' };
   const { doc, setDoc, serverTimestamp } = fb.fs;
@@ -358,6 +417,7 @@ export async function runCoaching(fb, uid, data, onResult = () => {}) {
 
   const done = [];
   const errors = [];
+  onStart(tasks.map(([kind]) => kind));
   await Promise.all(tasks.map(async ([kind, run]) => {
     try {
       await run();

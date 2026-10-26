@@ -46,7 +46,7 @@ export function renderSleep(state) {
     <section class="hero">
       <div class="hero-top">
         <span class="hero-date">SLEEP · ${day ? mmdd(day.date) : '—'}</span>
-        ${syncButton(state)}
+        ${syncButton(state, 'sleep')}
       </div>
       <span class="hero-caption hero-caption-tight">${sleepLabel(data, day)}</span>
       <span class="hero-big hero-big-md">${hm(w.sleepSecs)}</span>

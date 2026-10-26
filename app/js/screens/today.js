@@ -37,7 +37,7 @@ export function renderToday(state) {
       <div class="hero-top">
         <span class="hero-date">${heroDate(data.today)}</span>
         <div class="hero-actions">
-          ${syncButton(state)}
+          ${syncButton(state, 'today')}
           <a class="icon-btn" href="#settings" aria-label="설정">${GEAR}</a>
         </div>
       </div>

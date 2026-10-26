@@ -28,16 +28,34 @@ export class IntervalsError extends Error {
 }
 
 // Basic Auth: 사용자명 API_KEY, 비밀번호 = 개인 API 키
-export function intervalsClient({ apiKey, athleteId }) {
-  if (!apiKey || !athleteId) throw new Error('intervals.icu API 키와 Athlete ID가 필요해요.');
+function request(apiKey) {
   const auth = 'Basic ' + btoa(`API_KEY:${apiKey}`);
-  return async function get(path, params) {
-    const url = `${API}/athlete/${encodeURIComponent(athleteId)}/${path}?${new URLSearchParams(params)}`;
-    const res = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+  return async (path, params = {}) => {
+    const res = await fetch(`${API}/${path}?${new URLSearchParams(params)}`, {
+      headers: { Authorization: auth, Accept: 'application/json' },
+    });
     // 응답 본문에 개인 데이터가 섞일 수 있으니 상태 코드만 남긴다
-    if (!res.ok) throw new IntervalsError(res.status, path);
+    if (!res.ok) throw new IntervalsError(res.status, path.split('/').pop());
     return res.json();
   };
+}
+
+export function intervalsClient({ apiKey, athleteId }) {
+  if (!apiKey || !athleteId) throw new Error('intervals.icu API 키와 Athlete ID가 필요해요.');
+  const req = request(apiKey);
+  return (path, params) => req(`athlete/${encodeURIComponent(athleteId)}/${path}`, params);
+}
+
+// 러닝 상세 분석용: 랩(인터벌)과 초 단위 스트림. 스트림은 없어도 랩만으로 진행
+export async function fetchActivityDetail({ apiKey }, activityId) {
+  if (!apiKey) throw new Error('intervals.icu API 키가 필요해요.');
+  const req = request(apiKey);
+  const id = encodeURIComponent(activityId);
+  const [activity, streams] = await Promise.all([
+    req(`activity/${id}`, { intervals: 'true' }),
+    req(`activity/${id}/streams.json`, { types: 'time,distance,heartrate,cadence,altitude' }).catch(() => null),
+  ]);
+  return { intervals: activity?.icu_intervals ?? [], streams: Array.isArray(streams) ? streams : null };
 }
 
 function pickWellness(w) {
