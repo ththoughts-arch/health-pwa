@@ -48,8 +48,31 @@ async function candidateModels(key) {
     ...names.filter((n) => /flash/.test(n) && !/(image|tts|audio|live|embedding)/.test(n)),
   ])].slice(0, MAX_MODELS);
   if (!list.length) throw new Error('사용할 수 있는 Gemini 모델이 없어요.');
-  cachedModels = list;
-  return list;
+  // 이 기기에서 지난번에 성공한 모델이 아직 목록에 있으면 먼저 쓴다
+  const preferred = readPreferred();
+  cachedModels = preferred && names.includes(preferred) ? [preferred, ...list.filter((m) => m !== preferred)] : list;
+  return cachedModels;
+}
+
+const PREFERRED_KEY = 'gemini.preferredModel';
+function readPreferred() {
+  try { return localStorage.getItem(PREFERRED_KEY); } catch { return null; }
+}
+function rememberModel(model) {
+  try { localStorage.setItem(PREFERRED_KEY, model); } catch { /* 저장 못 해도 동작에는 지장 없음 */ }
+}
+
+// 응답 본문 → JSON. 비었거나 잘렸으면 이유(finishReason)를 담아 오류
+function parseResult(json) {
+  const cand = json.candidates?.[0];
+  const text = cand?.content?.parts?.filter((p) => !p.thought).map((p) => p.text ?? '').join('');
+  const why = cand?.finishReason ?? json.promptFeedback?.blockReason ?? '이유 없음';
+  if (!text) throw new Error(`Gemini 응답이 비어 있어요 (${why})`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Gemini 응답을 읽지 못했어요 (${why})`);
+  }
 }
 
 async function callModel(key, model, body) {
@@ -72,22 +95,23 @@ async function generate(key, system, payload, schema) {
     contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.5 },
   });
-  let lastError;
+  const errors = [];
   for (const model of models) {
+    const name = model.replace('models/', '');
     try {
-      const json = await callModel(key, model, body);
-      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('');
-      if (!text) throw new Error('Gemini 응답이 비어 있어요.');
-      // 이번에 된 모델을 다음 호출 때 먼저 쓴다
+      const result = parseResult(await callModel(key, model, body));
+      // 이번에 된 모델을 다음 호출(이 기기에서는 다음에 앱을 열 때도) 먼저 쓴다
       cachedModels = [model, ...models.filter((m) => m !== model)];
-      return { model: model.replace('models/', ''), result: JSON.parse(text) };
+      rememberModel(model);
+      return { model: name, result };
     } catch (e) {
-      lastError = e;
-      // 키 문제는 다른 모델로 바꿔도 같으니 바로 중단. 그 밖(바쁨·한도·모델별 요청 오류)은 다음 모델로
-      if (!(e instanceof GeminiError) || e.keyProblem) throw e;
+      // 키 문제는 다른 모델로 바꿔도 같으니 바로 중단. 그 밖(바쁨·한도·요청 오류·응답 잘림)은 다음 모델로
+      if (e instanceof GeminiError && e.keyProblem) throw e;
+      errors.push(`${name}: ${e.message}`);
     }
   }
-  throw lastError;
+  // 모든 모델 실패: 모델별 이유를 함께 보여 준다
+  throw new Error(errors.join(' / '));
 }
 
 // 설정의 "AI 연결 테스트": 후보 모델마다 짧은 JSON 응답을 요청해 결과를 줄 단위로 돌려준다

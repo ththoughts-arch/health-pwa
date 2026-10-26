@@ -1,5 +1,5 @@
 // 앱 파일을 바꾸면 버전을 올린다 → 이전 캐시 삭제
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CACHE = `health-${VERSION}`;
 const SHELL = [
   './',
