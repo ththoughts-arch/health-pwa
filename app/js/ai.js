@@ -77,29 +77,66 @@ function parseResult(json) {
 
 async function callModel(key, model, body) {
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${API}/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body,
-    });
+    // 한 번 호출이 너무 오래 걸리면 끊고 다음 모델로 (generate에서 처리)
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), CALL_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(`${API}/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body,
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error(`${CALL_TIMEOUT_MS / 1000}초 안에 응답이 없어요`);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     if (res.ok) return res.json();
     if (!BUSY.includes(res.status) || attempt >= RETRY_WAITS_MS.length) throw await errorFrom(res);
     await sleep(RETRY_WAITS_MS[attempt]);
   }
 }
 
-async function generate(key, system, payload, schema) {
-  const models = await candidateModels(key);
-  const body = JSON.stringify({
+const CALL_TIMEOUT_MS = 30000;
+// 최신 모델은 답하기 전 생각(thinking)에 시간을 쓴다 → 짧게(low). 지원하지 않는 모델은 빼고 다시 보낸다
+const THINKING = { thinkingLevel: 'low' };
+const noThinkingConfig = new Set();
+
+function requestBody(system, payload, schema, withThinking) {
+  return JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
-    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.5 },
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+      temperature: 0.5,
+      ...(withThinking ? { thinkingConfig: THINKING } : {}),
+    },
   });
+}
+
+async function callWithThinkingFallback(key, model, system, payload, schema) {
+  if (!noThinkingConfig.has(model)) {
+    try {
+      return await callModel(key, model, requestBody(system, payload, schema, true));
+    } catch (e) {
+      if (!(e instanceof GeminiError && e.status === 400 && /thinking/i.test(e.detail))) throw e;
+      noThinkingConfig.add(model);
+    }
+  }
+  return callModel(key, model, requestBody(system, payload, schema, false));
+}
+
+async function generate(key, system, payload, schema) {
+  const models = await candidateModels(key);
   const errors = [];
   for (const model of models) {
     const name = model.replace('models/', '');
     try {
-      const result = parseResult(await callModel(key, model, body));
+      const result = parseResult(await callWithThinkingFallback(key, model, system, payload, schema));
       // 이번에 된 모델을 다음 호출(이 기기에서는 다음에 앱을 열 때도) 먼저 쓴다
       cachedModels = [model, ...models.filter((m) => m !== model)];
       rememberModel(model);
@@ -196,10 +233,18 @@ function activityForAI(a) {
     elevationGainM: a.elevationGainM ? Math.round(a.elevationGainM) : null,
     trainingLoad: a.trainingLoad ?? null,
     hrZoneMinutes: Array.isArray(a.hrZoneSecs) ? a.hrZoneSecs.map((s) => mins(s)) : null,
-    hrZoneUpperBpm: a.hrZones ?? null,
     intervals: a.intervalSummary ?? null,
     rpe: a.rpe ?? null,
   };
+}
+
+// 값 없는 필드는 빼서 입력을 짧게 (응답 시간 단축)
+function compact(o) {
+  if (Array.isArray(o)) return o.map(compact);
+  if (o && typeof o === 'object') {
+    return Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, compact(v)]));
+  }
+  return o;
 }
 
 function wellnessForAI(w) {
@@ -224,13 +269,13 @@ function recoveryForAI(day) {
 function sleepPayload(data, day) {
   const yesterday = addDays(day.date, -1);
   const taken = data.checkins[yesterday]?.supplements ?? {};
-  return {
+  return compact({
     ...recoveryForAI(day),
     last14Nights: dateRange(day.date, 14).map((d) => ({ date: d, ...wellnessForAI(data.days[d]?.wellness) })),
     yesterdayTraining: data.activities.filter((a) => a.date === yesterday).map(activityForAI),
     supplementsTakenYesterday: data.supplements.filter((s) => taken[s.id]?.taken).map((s) => s.name),
     usualBedtime: data.settings.bedtime ?? null,
-  };
+  });
 }
 
 function exercisePayload(data, day) {
@@ -245,17 +290,21 @@ function exercisePayload(data, day) {
       sessions: acts.length,
     };
   });
-  return {
+  // 자세한 기록은 최근 2주만, 4주 흐름은 weeklyTotals로
+  const from = addDays(data.today, -13);
+  const recent = data.activities.filter((a) => a.date >= from).sort((a, b) => b.date.localeCompare(a.date));
+  return compact({
     today: data.today,
     zone2MaxHr: data.settings.zone2MaxHr ?? 140,
+    hrZoneUpperBpm: recent.find((a) => a.hrZones)?.hrZones ?? null,
     recovery: recoveryForAI(day),
     weeklyTotals: weeks,
-    activities: [...data.activities].sort((a, b) => b.date.localeCompare(a.date)).map(activityForAI),
-    strengthLogs: data.strength.map((s) => ({
+    activities: recent.map(activityForAI),
+    strengthLogs: data.strength.filter((s) => s.date >= from).map((s) => ({
       date: s.date,
       exercises: (s.exercises ?? []).map((e) => ({ name: e.name, kg: e.weightKg, sets: e.sets, reps: e.reps })),
     })),
-  };
+  });
 }
 
 // 같은 입력이면 다시 부르지 않기 위한 키
@@ -273,37 +322,51 @@ function exerciseKey(data) {
   return [data.today, ...ids, ...logs].join('|');
 }
 
-// 동기화 후 실행. 새 데이터가 있을 때만 Gemini 호출 (최대 2회)
-export async function runCoaching(fb, uid, data, onStep = () => {}) {
+// 동기화 후 실행. 새 데이터가 있을 때만, 수면·운동을 동시에 요청 (최대 2회).
+// 각각 끝나는 대로 data에 반영하고 onResult(kind)를 불러 화면을 바로 갱신하게 한다.
+export async function runCoaching(fb, uid, data, onResult = () => {}) {
   const key = data.keys.geminiApiKey;
-  if (!key) return { done: [], skipped: 'no-key' };
+  if (!key) return { done: [], errors: [], skipped: 'no-key' };
   const { doc, setDoc, serverTimestamp } = fb.fs;
-  const done = [];
   const day = pickDisplayDay(data);
+  const tasks = [];
 
   const sk = sleepKey(day);
   if (sk && day.ai?.sleepKey !== sk) {
-    onStep('수면 분석 중…');
-    const { model, result } = await generate(key, SLEEP_SYSTEM, sleepPayload(data, day), SLEEP_SCHEMA);
-    const ai = {
-      headline: result.headline,
-      sleep: { today: result.today, pattern: result.pattern, caution: result.caution, tonight: result.tonight },
-      sleepKey: sk,
-      model,
-    };
-    await setDoc(doc(fb.db, 'users', uid, 'days', day.date), { ai: { ...ai, createdAt: serverTimestamp() } }, { merge: true });
-    day.ai = { ...ai, createdAt: new Date() };
-    done.push('sleep');
+    tasks.push(['sleep', async () => {
+      const { model, result } = await generate(key, SLEEP_SYSTEM, sleepPayload(data, day), SLEEP_SCHEMA);
+      const ai = {
+        headline: result.headline,
+        sleep: { today: result.today, pattern: result.pattern, caution: result.caution, tonight: result.tonight },
+        sleepKey: sk,
+        model,
+      };
+      await setDoc(doc(fb.db, 'users', uid, 'days', day.date), { ai: { ...ai, createdAt: serverTimestamp() } }, { merge: true });
+      day.ai = { ...ai, createdAt: new Date() };
+    }]);
   }
 
   const ek = exerciseKey(data);
   if (ek && data.exerciseCoach?.key !== ek) {
-    onStep('운동 코칭 중…');
-    const { model, result } = await generate(key, EXERCISE_SYSTEM, exercisePayload(data, day), EXERCISE_SCHEMA);
-    const coach = { ...result, key: ek, date: data.today, model };
-    await setDoc(doc(fb.db, 'users', uid, 'coach', 'exercise'), { ...coach, createdAt: serverTimestamp() });
-    data.exerciseCoach = { ...coach, createdAt: new Date() };
-    done.push('exercise');
+    tasks.push(['exercise', async () => {
+      const { model, result } = await generate(key, EXERCISE_SYSTEM, exercisePayload(data, day), EXERCISE_SCHEMA);
+      const coach = { ...result, key: ek, date: data.today, model };
+      await setDoc(doc(fb.db, 'users', uid, 'coach', 'exercise'), { ...coach, createdAt: serverTimestamp() });
+      data.exerciseCoach = { ...coach, createdAt: new Date() };
+    }]);
   }
-  return { done };
+
+  const done = [];
+  const errors = [];
+  await Promise.all(tasks.map(async ([kind, run]) => {
+    try {
+      await run();
+      done.push(kind);
+      onResult(kind);
+    } catch (e) {
+      console.error(e);
+      errors.push(`${kind === 'sleep' ? '수면' : '운동'}: ${e.message}`);
+    }
+  }));
+  return { done, errors, pending: tasks.length };
 }

@@ -38,7 +38,7 @@ const state = {
   error: null,
   loginError: null,
   busy: false,
-  sync: { busy: false, step: null, message: null },
+  sync: { busy: false, ai: false, step: null, message: null },
   ui: { sleepRange: 'week', sport: 'all', feedback: 'health' },
 };
 
@@ -91,44 +91,54 @@ function render() {
     + (toast ? `<p class="toast" role="status">${toast}</p>` : '');
 }
 
-// 동기화 버튼: intervals.icu → 점수 → 저장 → (새 데이터면) AI 코칭
+// 동기화 버튼: intervals.icu → 점수 → 저장 → 화면 갱신. 그다음 (새 데이터면) AI 코칭을 뒤에서 받아 채운다
 async function runSync() {
-  if (state.sync.busy) return;
+  if (state.sync.busy || state.sync.ai) return;
   const { keys } = state.data;
   if (!keys.intervalsApiKey || !keys.intervalsAthleteId) {
     window.alert('설정에서 intervals.icu API 키와 Athlete ID를 먼저 넣어 주세요.');
     location.hash = '#settings';
     return;
   }
-  state.sync = { busy: true, step: '데이터 가져오는 중…', message: null };
+  state.sync = { busy: true, ai: false, step: '데이터 가져오는 중…', message: null };
   render();
-  let message;
   try {
     await syncNow(state.fb, state.user.uid, { keys, settings: state.data.settings, today: state.data.today });
     state.data = await loadAll(state.fb, state.user.uid);
-    message = '동기화했어요';
-    if (keys.geminiApiKey) {
-      try {
-        const { done } = await runCoaching(state.fb, state.user.uid, state.data, (step) => {
-          state.sync.step = step;
-          render();
-        });
-        if (done.length) message += ` · AI ${done.map((d) => (d === 'sleep' ? '수면 분석' : '운동 코칭')).join('·')} 새로 받음`;
-      } catch (e) {
-        console.error(e);
-        message += ` · AI 분석 실패: ${e.message}`;
-      }
-    } else {
-      message += ' · AI 분석은 설정에서 Gemini 키를 넣으면 시작돼요';
-    }
   } catch (e) {
     console.error(e);
-    message = e instanceof IntervalsError ? e.message
+    finishSync(e instanceof IntervalsError ? e.message
       : e.code === 'permission-denied' ? 'Firebase 규칙을 다시 게시해야 해요 (설정 참고)'
-      : '동기화하지 못했어요. 네트워크를 확인해 주세요.';
+      : '동기화하지 못했어요. 네트워크를 확인해 주세요.');
+    return;
   }
-  state.sync = { busy: false, step: null, message };
+  if (!keys.geminiApiKey) {
+    finishSync('동기화했어요 · AI 분석은 설정에서 Gemini 키를 넣으면 시작돼요');
+    return;
+  }
+
+  // 점수·기록은 바로 보여 주고, AI 문장은 도착하는 대로 채운다
+  state.sync = { busy: false, ai: true, step: 'AI 분석 중…', message: '동기화했어요' };
   render();
+  const data = state.data;
+  let result;
+  try {
+    result = await runCoaching(state.fb, state.user.uid, data, () => {
+      if (state.data === data) render();
+    });
+  } catch (e) {
+    result = { done: [], errors: [e.message], pending: 1 };
+  }
+  const parts = [];
+  if (result.done.length) parts.push(`AI ${result.done.map((d) => (d === 'sleep' ? '수면 분석' : '운동 코칭')).join('·')} 받았어요`);
+  if (result.errors.length) parts.push(`AI 분석 실패: ${result.errors.join(' / ')}`);
+  finishSync(parts.join(' · ') || null);
+}
+
+function finishSync(message) {
+  state.sync = { busy: false, ai: false, step: null, message };
+  render();
+  if (!message) return;
   // 실패 문구는 원인을 읽을 수 있게 더 오래 둔다
   setTimeout(() => {
     if (state.sync.message === message) { state.sync.message = null; render(); }
@@ -387,7 +397,7 @@ window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); }
 
 // 앱으로 돌아올 때 날짜가 바뀌었거나 아침 동기화가 끝났을 수 있으니 다시 불러온다
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.user && !state.sync.busy) refresh();
+  if (document.visibilityState === 'visible' && state.user && !state.sync.busy && !state.sync.ai) refresh();
 });
 
 render();

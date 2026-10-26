@@ -2,7 +2,8 @@
 const SYNC_ICON = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1B25" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>';
 
 export function syncButton({ sync }) {
-  const busy = !!sync?.busy;
+  // 데이터 동기화 중이거나 AI 분석을 받는 중
+  const busy = !!(sync?.busy || sync?.ai);
   return `<button type="button" class="sync-btn ${busy ? 'is-busy' : ''}" data-action="sync" ${busy ? 'disabled' : ''}
     aria-label="${busy ? esc(sync.step ?? '동기화 중') : '지금 동기화'}">${SYNC_ICON}${busy ? `<span class="sync-step">${esc(sync.step ?? '')}</span>` : ''}</button>`;
 }
