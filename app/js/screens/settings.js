@@ -15,7 +15,17 @@ function keyRow(keys, field, title, help) {
     </label>`;
 }
 
-export function renderSettings({ data, user }) {
+function aiTestBlock(keys, test) {
+  if (!keys.geminiApiKey) return '';
+  return `
+    <div class="key-row">
+      <button type="button" class="ghost-btn" data-action="ai-test" ${test?.busy ? 'disabled' : ''}>
+        ${test?.busy ? 'AI 연결 확인 중…' : 'AI 연결 테스트'}</button>
+      ${test?.lines ? `<div class="test-result">${test.lines.map((l) => `<p class="sub">${esc(l)}</p>`).join('')}</div>` : ''}
+    </div>`;
+}
+
+export function renderSettings({ data, user, ui }) {
   const s = data.settings;
   const k = data.keys;
   return `
@@ -61,6 +71,7 @@ export function renderSettings({ data, user }) {
           placeholder="i123456" data-change="key" data-field="intervalsAthleteId">
       </label>
       ${keyRow(k, 'geminiApiKey', 'Gemini API 키 (무료)', 'aistudio.google.com → Get API key. 수치만 보내고 이름·메모는 보내지 않아요')}
+      ${aiTestBlock(k, ui.aiTest)}
 
       <div class="setting-row">
         <span class="setting-text">

@@ -287,6 +287,7 @@ p { margin: 0; }
 }
 .key-row { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .ai-meta { padding-top: 10px; }
+.test-result { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--chip); word-break: break-word; }
 
 /* 영양제 목록 편집 */
 .chip-btn {

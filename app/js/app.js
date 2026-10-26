@@ -5,7 +5,7 @@ import {
   saveSupplement, saveSupplementDef, seedSupplements, sortStrength,
 } from './data.js';
 import { syncNow } from './sync.js';
-import { runCoaching } from './ai.js';
+import { diagnoseGemini, runCoaching } from './ai.js';
 import { IntervalsError } from './intervals.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
@@ -129,9 +129,10 @@ async function runSync() {
   }
   state.sync = { busy: false, step: null, message };
   render();
+  // 실패 문구는 원인을 읽을 수 있게 더 오래 둔다
   setTimeout(() => {
     if (state.sync.message === message) { state.sync.message = null; render(); }
-  }, 5000);
+  }, message.includes('실패') || message.includes('못했') ? 12000 : 5000);
 }
 
 async function refresh() {
@@ -231,6 +232,18 @@ const actions = {
     save(() => deleteStrength(state.fb, state.user.uid, d.id));
   },
   sync: () => runSync(),
+  'ai-test': async () => {
+    state.ui.aiTest = { busy: true };
+    render();
+    let lines;
+    try {
+      lines = await diagnoseGemini(state.data.keys.geminiApiKey);
+    } catch (e) {
+      lines = [`테스트 실패: ${e.message}`];
+    }
+    state.ui.aiTest = { busy: false, lines };
+    render();
+  },
   logout: () => state.fb.au.signOut(state.fb.auth),
 };
 

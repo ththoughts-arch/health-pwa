@@ -5,14 +5,25 @@ import { dateRange, pickDisplayDay } from './model.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
+// detail: Gemini가 돌려준 오류 문구 (개인정보 없음, 원인 파악용으로 화면에 함께 표시)
 export class GeminiError extends Error {
-  constructor(status) {
-    super(status === 429 ? 'Gemini 무료 한도를 넘었어요. 잠시 후 다시 동기화해 주세요.'
-      : status === 400 || status === 401 || status === 403 ? 'Gemini API 키를 확인해 주세요.'
+  constructor(status, detail = '') {
+    const keyProblem = status === 401 || status === 403 || (status === 400 && /api key/i.test(detail));
+    const base = status === 429 ? 'Gemini 무료 한도를 넘었어요. 잠시 후 다시 동기화해 주세요.'
+      : keyProblem ? 'Gemini API 키를 확인해 주세요.'
       : BUSY.includes(status) ? 'Gemini 서버가 바빠요. 잠시 후 다시 동기화해 주세요.'
-      : `Gemini 오류 (HTTP ${status})`);
+      : `Gemini 요청 오류 (HTTP ${status})`;
+    super(detail ? `${base} [${detail.slice(0, 140)}]` : base);
     this.status = status;
+    this.detail = detail;
+    this.keyProblem = keyProblem;
   }
+}
+
+async function errorFrom(res) {
+  let detail = '';
+  try { detail = (await res.json())?.error?.message ?? ''; } catch { /* 본문 없음 */ }
+  return new GeminiError(res.status, detail);
 }
 
 // 서버가 바쁠 때(일시적) → 기다렸다 재시도, 그래도 안 되면 다음 모델
@@ -26,7 +37,7 @@ let cachedModels = null;
 async function candidateModels(key) {
   if (cachedModels) return cachedModels;
   const res = await fetch(`${API}/models?pageSize=200`, { headers: { 'x-goog-api-key': key } });
-  if (!res.ok) throw new GeminiError(res.status);
+  if (!res.ok) throw await errorFrom(res);
   const { models = [] } = await res.json();
   const names = models.filter((m) => m.supportedGenerationMethods?.includes('generateContent')).map((m) => m.name);
   const version = (n) => parseFloat(n.match(/gemini-([\d.]+)/)?.[1] ?? '0');
@@ -49,7 +60,7 @@ async function callModel(key, model, body) {
       body,
     });
     if (res.ok) return res.json();
-    if (!BUSY.includes(res.status) || attempt >= RETRY_WAITS_MS.length) throw new GeminiError(res.status);
+    if (!BUSY.includes(res.status) || attempt >= RETRY_WAITS_MS.length) throw await errorFrom(res);
     await sleep(RETRY_WAITS_MS[attempt]);
   }
 }
@@ -72,11 +83,37 @@ async function generate(key, system, payload, schema) {
       return { model: model.replace('models/', ''), result: JSON.parse(text) };
     } catch (e) {
       lastError = e;
-      // 키 문제는 다른 모델로 바꿔도 같으니 바로 중단. 바쁨·한도 초과는 다음 모델로
-      if (!(e instanceof GeminiError) || !(BUSY.includes(e.status) || e.status === 429)) throw e;
+      // 키 문제는 다른 모델로 바꿔도 같으니 바로 중단. 그 밖(바쁨·한도·모델별 요청 오류)은 다음 모델로
+      if (!(e instanceof GeminiError) || e.keyProblem) throw e;
     }
   }
   throw lastError;
+}
+
+// 설정의 "AI 연결 테스트": 후보 모델마다 짧은 JSON 응답을 요청해 결과를 줄 단위로 돌려준다
+export async function diagnoseGemini(key) {
+  cachedModels = null;
+  let models;
+  try {
+    models = await candidateModels(key);
+  } catch (e) {
+    return [`모델 목록: ${e.message}`];
+  }
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: '{"ping":1}' }] }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: objectOf(['ok']), maxOutputTokens: 20 },
+  });
+  const lines = [`후보 모델: ${models.map((m) => m.replace('models/', '')).join(', ')}`];
+  for (const model of models) {
+    const res = await fetch(`${API}/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body,
+    });
+    const name = model.replace('models/', '');
+    lines.push(res.ok ? `${name}: 성공` : `${name}: ${(await errorFrom(res)).message}`);
+  }
+  return lines;
 }
 
 const str = { type: 'STRING' };
