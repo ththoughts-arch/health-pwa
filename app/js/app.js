@@ -6,7 +6,7 @@ import {
   seedSupplements, sortStrength,
 } from './data.js';
 import { syncNow } from './sync.js';
-import { analyzeActivity, diagnoseGemini, runCoaching } from './ai.js';
+import { analyzeActivity, diagnoseGemini, recoachExercise, runCoaching } from './ai.js';
 import { IntervalsError, fetchActivityDetail } from './intervals.js';
 import { summarizeLaps, summarizeStreams } from './run.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
@@ -198,9 +198,34 @@ async function runSync() {
   finishSync(parts.join(' · ') || null);
 }
 
+// 공유 메모를 저장·삭제하면 운동 코칭을 바로 다시 받는다 (메모 내용 비교 없이 무조건).
+// 동기화·AI 분석 중이면 끝난 뒤 이어서 실행
+let recoachQueued = false;
+async function recoach() {
+  if (state.sync.busy || state.sync.ai) { recoachQueued = true; return; }
+  if (state.stale) { await ready; await state.refreshing; }
+  if (!state.data?.keys.geminiApiKey) return;
+  state.sync = { busy: false, ai: true, step: null, pending: ['exercise'], message: null };
+  render();
+  let message;
+  try {
+    await recoachExercise(state.fb, state.user.uid, state.data);
+    saveSnapshot(state.user, state.data);
+    message = '훈련 계획 메모를 반영해 운동 코칭을 새로 받았어요';
+  } catch (e) {
+    console.error(e);
+    message = `운동 코칭 실패: ${e.message}`;
+  }
+  finishSync(message);
+}
+
 function finishSync(message) {
   state.sync = { busy: false, ai: false, step: null, message };
   render();
+  if (recoachQueued) {
+    recoachQueued = false;
+    recoach();
+  }
   if (!message) return;
   // 실패 문구는 원인을 읽을 수 있게 더 오래 둔다
   setTimeout(() => {
@@ -334,10 +359,13 @@ const actions = {
   'memo-delete': () => {
     const d = state.ui.memoDraft;
     if (!window.confirm('이 메모를 삭제할까요? 되돌릴 수 없어요.')) return;
+    const wasShared = !!state.data.memos.find((m) => m.id === d.id)?.shareAI;
     state.data.memos = state.data.memos.filter((m) => m.id !== d.id);
     state.ui.memoDraft = null;
     location.hash = '#memo';
     save(() => deleteMemo(state.fb, state.user.uid, d.id));
+    // 지운 계획이 코칭에 남지 않게
+    if (wasShared) recoach();
   },
   'ai-test': async () => {
     state.ui.aiTest = { busy: true };
@@ -470,6 +498,7 @@ view.addEventListener('submit', async (e) => {
     const isNew = !d.id;
     const id = d.id ?? newMemoId(state.fb, state.user.uid);
     const now = new Date();
+    const wasShared = !isNew && !!state.data.memos.find((m) => m.id === id)?.shareAI;
     state.data.memos = [
       { id, ...fields, createdAt: isNew ? now : state.data.memos.find((m) => m.id === id)?.createdAt },
       ...state.data.memos.filter((m) => m.id !== id),
@@ -477,6 +506,8 @@ view.addEventListener('submit', async (e) => {
     state.ui.memoDraft = null;
     if (!isNew) location.hash = '#memo';
     save(() => saveMemo(state.fb, state.user.uid, id, fields, isNew));
+    // 공유 메모를 저장하면(또는 공유를 끄면) 운동 코칭에 바로 반영
+    if (fields.shareAI || wasShared) recoach();
     return;
   }
 

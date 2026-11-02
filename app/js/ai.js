@@ -404,9 +404,23 @@ function exerciseKey(data) {
   const ids = data.activities.filter((a) => a.date >= from).map((a) => a.id).sort();
   const logs = data.strength.filter((s) => s.date >= from).map((s) => `${s.id}:${(s.exercises ?? []).length}`).sort();
   if (!ids.length && !logs.length) return null;
-  // 공유한 계획 메모가 바뀌어도 다시 코칭
-  const notes = sharedPlanNotes(data).map((n) => `${n.date}:${n.text.length}`);
-  return [data.today, ...ids, ...logs, ...notes].join('|');
+  // 계획 메모 변경은 여기서 판단하지 않는다 → 공유 메모를 저장·삭제하면 recoachExercise로 무조건 다시 받음
+  return [data.today, ...ids, ...logs].join('|');
+}
+
+// 운동 코칭 한 번 받아 저장. 반영한 공유 메모의 작성 날짜를 함께 남겨 화면에 표시
+async function coachExercise(fb, uid, data, day, key) {
+  const { doc, setDoc, serverTimestamp } = fb.fs;
+  const { model, result } = await generate(data.keys.geminiApiKey, EXERCISE_SYSTEM, exercisePayload(data, day), EXERCISE_SCHEMA);
+  const coach = { ...result, key, date: data.today, model, memoDates: sharedPlanNotes(data).map((n) => n.date) };
+  await setDoc(doc(fb.db, 'users', uid, 'coach', 'exercise'), { ...coach, createdAt: serverTimestamp() });
+  data.exerciseCoach = { ...coach, createdAt: new Date() };
+}
+
+// 공유 메모를 저장·삭제했을 때: 운동 기록 변화와 상관없이 바로 다시 코칭
+export async function recoachExercise(fb, uid, data) {
+  if (!data.keys.geminiApiKey) throw new Error('설정에서 Gemini API 키를 넣어 주세요.');
+  await coachExercise(fb, uid, data, pickDisplayDay(data), exerciseKey(data) ?? data.today);
 }
 
 // 러닝·트레일·수영 한 번 상세 분석 → activities/{id}.ai, 계산한 스플릿 등은 .detail (다음에 열 때 다시 부르지 않음)
@@ -476,12 +490,7 @@ export async function runCoaching(fb, uid, data, onResult = () => {}, onStart = 
 
   const ek = exerciseKey(data);
   if (ek && data.exerciseCoach?.key !== ek) {
-    tasks.push(['exercise', async () => {
-      const { model, result } = await generate(key, EXERCISE_SYSTEM, exercisePayload(data, day), EXERCISE_SCHEMA);
-      const coach = { ...result, key: ek, date: data.today, model };
-      await setDoc(doc(fb.db, 'users', uid, 'coach', 'exercise'), { ...coach, createdAt: serverTimestamp() });
-      data.exerciseCoach = { ...coach, createdAt: new Date() };
-    }]);
+    tasks.push(['exercise', () => coachExercise(fb, uid, data, day, ek)]);
   }
 
   const done = [];

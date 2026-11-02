@@ -86,12 +86,22 @@ export function renderExercise(state) {
         : '<p class="sub">이번 주 심박 기록이 있는 운동이 없어요.</p>'}
       </div>
 
-      ${feedback(data, ui, thisWeek, dist, now)}
+      ${feedback(data, ui, thisWeek, dist, now, state.sync)}
       ${recent(data, sport)}
     </div>`;
 }
 
-function feedback(data, ui, thisWeek, dist, secs) {
+// '훈련 계획 메모 반영(11.02) · 11.03 분석' / 다시 받는 중이면 진행 문구
+function coachMeta(ai, sync) {
+  if (sync?.ai && sync.pending?.includes('exercise')) {
+    return '<span class="sub ai-meta">운동 코칭을 새로 받는 중…</span>';
+  }
+  if (!ai?.date) return '';
+  const memo = ai.memoDates?.length ? `훈련 계획 메모 반영(${ai.memoDates.map(mmdd).join(', ')}) · ` : '';
+  return `<span class="sub ai-meta">${memo}${mmdd(ai.date)} 분석</span>`;
+}
+
+function feedback(data, ui, thisWeek, dist, secs, sync) {
   const day = pickDisplayDay(data);
   const health = ui.feedback !== 'coach';
   const ai = data.exerciseCoach;   // coach/exercise (Gemini, 동기화 때 갱신)
@@ -129,7 +139,7 @@ function feedback(data, ui, thisWeek, dist, secs) {
       ${warnText ? `<div class="warn-inline"><span class="warn-dot" aria-hidden="true"></span>
         <span class="warn-ink">${esc(warnText)}</span></div>` : ''}
       <div class="feedback-text">${lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>
-      ${ai?.date ? `<span class="sub ai-meta">${ai.date.slice(5).replace('-', '.')} 분석 · ${esc(ai.model ?? '')}</span>` : ''}
+      ${coachMeta(ai, sync)}
     </div>`;
 }
 
