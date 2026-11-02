@@ -1,5 +1,5 @@
 import { SPORT_LABEL, duration, esc, hm, mmdd, warningText } from '../format.js';
-import { activitiesBetween, intensity, pickDisplayDay } from '../model.js';
+import { activitiesBetween, intensity, pickDisplayDay, recommendedExercise } from '../model.js';
 import { addDays } from '../score.js';
 import { exerciseSummary } from './strength.js';
 import { syncButton } from './common.js';
@@ -71,6 +71,10 @@ export function renderExercise(state) {
         ${FILTERS.map(([id, label]) => `<button type="button" class="pill" data-action="sport" data-sport="${id}" aria-pressed="${id === sport}">${label}</button>`).join('')}
       </div>
 
+      ${todayWorkout(data, state.sync)}
+      ${feedback(data, ui, thisWeek, dist, now, state.sync)}
+      ${recent(data, sport)}
+
       <div class="block block-line">
         <div class="block-head">
           <span class="block-title-sm">강도 분포</span>
@@ -85,9 +89,38 @@ export function renderExercise(state) {
           <div class="dist-labels num"><span>쉬움 ${dist.easy}</span><span>보통 ${dist.mid}</span><span class="warn-ink">고강도 ${dist.hard}</span></div>`
         : '<p class="sub">이번 주 심박 기록이 있는 운동이 없어요.</p>'}
       </div>
+    </div>`;
+}
 
-      ${feedback(data, ui, thisWeek, dist, now, state.sync)}
-      ${recent(data, sport)}
+// 오늘의 운동: 운동 코칭(Gemini)이 공유한 훈련 계획 메모와 회복 상태를 보고 만든 것.
+// 코칭이 다른 날 것이면 날짜를 밝히고, 아직 없으면 컨디션 점수 기준 권장으로 대신한다
+function todayWorkout(data, sync) {
+  const ai = data.exerciseCoach;
+  const tw = ai?.todayWorkout;
+  const busy = sync?.ai && sync.pending?.includes('exercise');
+  let body;
+  if (tw?.title) {
+    const stale = ai.date !== data.today;
+    body = `
+      <span class="tw-title">${esc(tw.title)}</span>
+      ${tw.plan ? `<p class="tw-plan">${esc(tw.plan)}</p>` : ''}
+      ${tw.reason ? `<p class="sub ink2">${esc(tw.reason)}</p>` : ''}
+      ${stale ? `<p class="sub warn-ink">${mmdd(ai.date)}에 만든 계획이에요. 동기화하면 오늘 운동으로 바뀌어요.</p>` : ''}`;
+  } else {
+    const plan = recommendedExercise(pickDisplayDay(data));
+    body = plan === '—'
+      ? '<span class="tw-title">아직 계획이 없어요</span><p class="sub ink2">동기화하면 훈련 계획 메모를 반영한 오늘의 운동을 만들어 드려요.</p>'
+      : `<span class="tw-title">${esc(plan)}</span>
+        <p class="sub ink2">컨디션 점수 기준 권장이에요. 동기화하면 훈련 계획 메모를 반영한 오늘의 운동을 만들어 드려요.</p>`;
+  }
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][new Date(`${data.today}T00:00:00`).getDay()];
+  return `
+    <div class="grad-card grad-card-col today-workout">
+      <div class="block-head tw-head">
+        <span class="grad-card-title">오늘의 운동</span>
+        <span class="sub ink2">${busy ? '새로 만드는 중…' : `${mmdd(data.today)} (${weekday})`}</span>
+      </div>
+      ${body}
     </div>`;
 }
 

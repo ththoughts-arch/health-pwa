@@ -296,6 +296,10 @@ p { margin: 0; }
 }
 .key-row { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .ai-meta { padding-top: 10px; }
+.today-workout { margin: 0 0 6px; gap: 8px; }
+.tw-head { padding-bottom: 0; }
+.tw-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--accent-text); }
+.tw-plan { font-size: 15px; line-height: 1.65; color: #24252F; }
 .test-result { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--chip); word-break: break-word; }
 
 /* 러닝 상세 */

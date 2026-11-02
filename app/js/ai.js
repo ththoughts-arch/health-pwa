@@ -209,7 +209,14 @@ const EXERCISE_SYSTEM = `너는 두 역할을 한다.${COMMON}
    - strength(헬스): 운동 종목·무게·세트×횟수의 진행, 러닝과의 균형.
    - all: 종목 전체를 보는 이번 주 계획 요약.
    - 해당 종목 기록이 없으면 그 종목은 빈 문자열.
-- warning: 회복 지표가 나쁘거나 부하가 급증해 코치 추천보다 휴식이 먼저일 때만 1문장, 없으면 빈 문자열. 건강 경고가 코치 추천과 충돌하면 코치 문장도 그에 맞춰 낮춘다.`;
+- warning: 회복 지표가 나쁘거나 부하가 급증해 코치 추천보다 휴식이 먼저일 때만 1문장, 없으면 빈 문자열. 건강 경고가 코치 추천과 충돌하면 코치 문장도 그에 맞춰 낮춘다.
+3) 오늘의 운동(todayWorkout): today(날짜)·todayWeekday(요일)에 할 운동 하나.
+   - trainingPlanNotes(사용자가 공유한 훈련 계획 메모)에 오늘 요일·날짜에 해당하는 운동이 있으면 그것을 기본으로 한다. 계획에 없으면 최근 기록과 주간 흐름으로 정한다(휴식일 포함).
+   - 회복 상태(recovery의 score·warnings, warning)가 나쁘면 강도·시간을 낮추거나 휴식으로 바꾸고, 그 이유를 reason에 적는다.
+   - activities에 오늘 날짜 기록이 이미 있으면 계획한 운동을 마쳤는지 판단해 title을 '완료: …'로 하고, plan에 남은 회복·보강을 적는다.
+   - title: 운동 이름과 핵심 수치 한 줄(예: '존2 러닝 50분', '수영 1,500m 인터벌', '휴식').
+   - plan: 워밍업 → 메인 → 쿨다운 구성과 페이스·심박 범위(존2 상한 zone2MaxHr)·세트를 구체적으로 2~3문장.
+   - reason: 계획 메모의 어느 부분을 따랐는지와 회복 상태를 근거로 왜 이 운동인지 1~2문장.`;
 
 const RUN_SYSTEM = `너는 러닝 코치이자 건강 전문가다. 러닝 한 번을 아주 자세히 분석한다.${COMMON}
 - 입력: run(이번 러닝 요약), splits(1km 구간별 paceSecPerKm·심박·케이던스·상승, 마지막은 partialM 미터짜리 남은 구간일 수 있음), firstHalf/secondHalf(시간 기준 전반·후반), decouplingPct(같은 심박 대비 속도 저하율. 5% 미만이면 유산소 기반이 안정적), hrDriftBpm, laps(랩·인터벌), recentRuns(최근 같은 종목 기록), recovery(그날 회복 상태), zone2MaxHr, hrZoneUpperBpm(존별 상한 bpm), trainingPlanNotes(사용자가 공유한 훈련 계획 메모. 있으면 계획 대비로 평가).
@@ -243,10 +250,17 @@ const SLEEP_SCHEMA = objectOf(['headline', ...SLEEP_FIELDS]);
 const SLEEP_PROMPT_VERSION = 2;
 const RUN_SCHEMA = objectOf(['summary', 'pacing', 'heartRate', 'form', 'intervals', 'comparison', 'nextRun', 'caution']);
 const SWIM_SCHEMA = objectOf(['summary', 'pacing', 'sets', 'heartRate', 'technique', 'comparison', 'nextSwim', 'caution']);
+// 운동 코칭 형식을 바꾸면 올린다 → 다음 동기화 때 새 형식으로 다시 받음 (2: 오늘의 운동 추가)
+const EXERCISE_PROMPT_VERSION = 2;
 const EXERCISE_SCHEMA = {
   type: 'OBJECT',
-  properties: { warning: str, health: str, coach: objectOf(['all', 'run', 'trail', 'swim', 'strength']) },
-  required: ['warning', 'health', 'coach'],
+  properties: {
+    warning: str,
+    health: str,
+    coach: objectOf(['all', 'run', 'trail', 'swim', 'strength']),
+    todayWorkout: objectOf(['title', 'plan', 'reason']),
+  },
+  required: ['warning', 'health', 'coach', 'todayWorkout'],
 };
 
 const r1 = (x) => (x == null ? null : Math.round(x * 10) / 10);
@@ -370,6 +384,7 @@ function exercisePayload(data, day) {
   const recent = data.activities.filter((a) => a.date >= from).sort((a, b) => b.date.localeCompare(a.date));
   return compact({
     today: data.today,
+    todayWeekday: ['일', '월', '화', '수', '목', '금', '토'][new Date(`${data.today}T00:00:00`).getDay()],
     zone2MaxHr: data.settings.zone2MaxHr ?? 140,
     hrZoneUpperBpm: recent.find((a) => a.hrZones)?.hrZones ?? null,
     recovery: recoveryForAI(day),
@@ -403,9 +418,10 @@ function exerciseKey(data) {
   const from = addDays(data.today, -13);
   const ids = data.activities.filter((a) => a.date >= from).map((a) => a.id).sort();
   const logs = data.strength.filter((s) => s.date >= from).map((s) => `${s.id}:${(s.exercises ?? []).length}`).sort();
-  if (!ids.length && !logs.length) return null;
+  // 최근 운동이 없어도 공유한 계획 메모가 있으면 오늘의 운동을 만든다
+  if (!ids.length && !logs.length && !sharedPlanNotes(data).length) return null;
   // 계획 메모 변경은 여기서 판단하지 않는다 → 공유 메모를 저장·삭제하면 recoachExercise로 무조건 다시 받음
-  return [data.today, ...ids, ...logs].join('|');
+  return [`v${EXERCISE_PROMPT_VERSION}`, data.today, ...ids, ...logs].join('|');
 }
 
 // 운동 코칭 한 번 받아 저장. 반영한 공유 메모의 작성 날짜를 함께 남겨 화면에 표시
