@@ -7,6 +7,24 @@ import { syncButton } from './common.js';
 const FILTERS = [['all', '전체'], ['run', '러닝'], ['trail', '트레일'], ['swim', '수영'], ['strength', '헬스']];
 const COACH = { all: '종목 코치', run: '러닝 코치', trail: '트레일 코치', swim: '수영 코치', strength: '헬스 코치' };
 
+// 주간 목표(WHO 권장 중강도 주 150분) 진행률. 100%를 넘으면 막대 전체 길이를 늘려 넘친 만큼 보여 준다
+const WEEKLY_GOAL_MIN = 150;
+function goalBar(secs) {
+  const pct = Math.round((secs / 60 / WEEKLY_GOAL_MIN) * 100);
+  const scale = Math.max(100, Math.ceil(pct / 10) * 10);   // 막대 끝 = 100% 또는 그 이상
+  return `
+    <div class="goal" role="img" aria-label="주 ${WEEKLY_GOAL_MIN}분 목표의 ${pct}%">
+      <div class="goal-track">
+        <div class="goal-fill ${pct >= 100 ? 'is-over' : ''}" style="width:${(Math.min(pct, scale) / scale) * 100}%"></div>
+        ${scale > 100 ? `<div class="goal-mark" style="left:${(100 / scale) * 100}%"></div>` : ''}
+      </div>
+      <div class="goal-labels">
+        <span class="num goal-pct">${pct}%</span>
+        <span class="sub ink2">주 ${WEEKLY_GOAL_MIN}분 목표${pct >= 100 ? ` · ${Math.round(secs / 60 - WEEKLY_GOAL_MIN)}분 초과` : ` · ${Math.max(0, WEEKLY_GOAL_MIN - Math.round(secs / 60))}분 남음`}</span>
+      </div>
+    </div>`;
+}
+
 // 초 → '02H 45M' (단위는 작게)
 function hoursMinutes(secs) {
   const m = Math.round(secs / 60);
@@ -45,6 +63,7 @@ export function renderExercise(state) {
           <span class="sub ink2">지난주 대비 · ${thisWeek.length}회</span>
         </div>
       </div>
+      ${goalBar(now)}
     </section>
 
     <div class="section section-tight">
@@ -137,9 +156,9 @@ function recent(data, sport) {
     </div>`;
 }
 
-// 러닝·트레일은 눌러서 상세 분석(#run=ID)으로
+// 러닝·트레일·수영은 눌러서 상세 분석(#run=ID)으로
 function actRow(a) {
-  const run = a.sport === 'run' || a.sport === 'trail';
+  const run = a.sport === 'run' || a.sport === 'trail' || a.sport === 'swim';
   const tag = run ? 'a' : 'div';
   const link = run ? ` href="#run=${encodeURIComponent(a.id)}" aria-label="${mmdd(a.date)} ${SPORT_LABEL[a.sport]} 상세 분석"` : '';
   return `

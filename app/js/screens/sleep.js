@@ -110,9 +110,11 @@ function chart(data, day, range) {
 function analysis(day) {
   const ai = day?.ai?.sleep;
   const rows = [];
-  if (ai?.today) rows.push(['오늘', ai.today, false]);
-  if (ai?.pattern) rows.push(['패턴', ai.pattern, false]);
-  if (ai?.tonight) rows.push(['오늘 밤', ai.tonight, false]);
+  // 수면 AI v2 항목 순서 (v1 결과는 today·pattern·tonight만 있음)
+  for (const [k, label] of [['today', '오늘'], ['recovery', '회복'], ['debt', '수면 빚'], ['pattern', '패턴'],
+    ['training', '운동 영향'], ['supplements', '영양제'], ['tonight', '오늘 밤']]) {
+    if (ai?.[k]) rows.push([label, ai[k], false]);
+  }
   for (const w of day?.warnings ?? []) rows.push(['주의', warningText(w), true]);
   if (ai?.caution) rows.push(['주의', ai.caution, true]);
   if (!ai) rows.unshift(['오늘', '동기화하면 이 수면 기록으로 AI 분석을 보여 드려요. 설정에서 Gemini API 키가 필요해요.', false]);

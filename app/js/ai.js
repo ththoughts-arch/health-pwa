@@ -187,19 +187,25 @@ const COMMON = `
 - 입력 수치를 근거로 구체적으로 말한다. 입력에 없는 데이터(수면 단계, SpO2, 호흡수, 스트레스 등)는 추측하거나 언급하지 않는다.
 - 한국어 존댓말 '~요'체. 짧고 실천할 수 있게. 이모지·마크다운 쓰지 않는다.`;
 
-const SLEEP_SYSTEM = `너는 수면·회복을 건강 관점에서 봐 주는 코치다.${COMMON}
+const SLEEP_SYSTEM = `너는 수면·회복을 건강 관점에서 자세히 봐 주는 코치다.${COMMON}
 - sleepQuality는 1 아주 좋음 ~ 4 나쁨 척도다. 컨디션 점수는 수면40+회복40+운동부하20 고정 계산식이며 band는 good/normal/low다.
+- stats는 앱이 계산한 값이다: last7(최근 7일 평균), sleepDebt7Min(최근 7일 적정 수면 대비 부족분 합, 분), sleepStdMin(14일 수면 시간 표준편차, 클수록 불규칙), weekdayAvgMin/weekendAvgMin, hrvOnTargetNights/hrvOnShortNights(적정 수면을 채운 밤과 못 채운 밤의 평균 HRV), hrv7vs30Pct, restingHR7vs30.
+- 모든 항목은 입력 숫자를 직접 인용하며 2~3문장. 판단할 데이터가 없으면 빈 문자열.
 - headline: 오늘 아침 홈 화면 한 줄(45자 안팎). 오늘 어떻게 지내면 좋을지까지.
-- today: 어젯밤 수면과 회복을 평소와 비교한 평가 1~2문장.
-- pattern: 최근 14일 기록에서 보이는 패턴과 이 사람에게 맞는 수면 습관 제안 1~2문장. 데이터가 적으면 그렇다고 말한다.
-- caution: 건강 경고가 필요할 때만 1문장, 없으면 빈 문자열.
-- tonight: 오늘 밤 실천할 것 한 가지(취침 시각·운동 강도 등) 1문장.`;
+- today: 어젯밤 수면 시간·점수·질을 평소·적정 수면과 비교한 평가.
+- recovery: 밤사이 HRV·안정시 심박을 30일 기준과 비교하고, 최근 7일 흐름(hrv7vs30Pct·restingHR7vs30)이 오르는지 내려가는지.
+- debt: 최근 7일 수면 빚이 얼마나 쌓였는지와 며칠에 걸쳐 어떻게 갚을지(하루 몇 분 더 자기 등).
+- pattern: 규칙성(표준편차·평일/주말 차이)과 이 사람에게서 보이는 관계(적정 수면을 채운 밤의 HRV 차이 등), 이 사람에게 맞는 수면 습관.
+- training: 어제 운동(종료 시각·강도·부하)이 어젯밤 수면에 준 영향과 오늘 운동 강도 제안. 어제 운동이 없으면 빈 문자열.
+- supplements: 어제 먹은 영양제와 수면의 관계는 데이터가 적으면 '참고 수준'이라고 밝히고 짧게. 없으면 빈 문자열.
+- tonight: 오늘 밤 권장 잠드는 시각(usualBedtime·수면 빚 반영, 'HH:MM')과 실천 두 가지(카페인 마감 시각, 저녁 운동 강도, 화면 끄기 등).
+- caution: 건강 경고가 필요할 때만, 없으면 빈 문자열.`;
 
 const EXERCISE_SYSTEM = `너는 두 역할을 한다.${COMMON}
 1) 건강 전문가(health): 최근 7일 운동 시간이 주 150분 권장에 맞는지, 강도 분포(대부분 존2 이하가 바람직, 존2 상한 zone2MaxHr bpm), 급격한 부하 증가(최근 7일 ÷ 그 앞 4주 주평균)와 회복 지표(HRV·안정시 심박)를 함께 본 과훈련·부상 위험, 꾸준함. 2~3문장.
 2) 종목 코치(coach): 기록을 보고 다음에 어떻게 할지 구체적으로 추천한다(거리·시간·페이스·심박 범위·세트 등). 각 2~3문장.
    - run(러닝)·trail(트레일): 페이스와 심박의 관계(같은 심박에서 페이스 변화), 존 분포, 케이던스, 인터벌 구성, 롱런 비중. 러닝이 가장 중요하니 가장 자세히.
-   - swim(수영): 100m 페이스, 거리, 빈도.
+   - swim(수영): 100m 페이스 변화와 후반 처짐, 세트 구성, 주간 거리·빈도. 다음 수영을 '8×100m @2:05 휴식 20초'처럼 세트로 적고 드릴 하나를 붙인다. 3~4문장.
    - strength(헬스): 운동 종목·무게·세트×횟수의 진행, 러닝과의 균형.
    - all: 종목 전체를 보는 이번 주 계획 요약.
    - 해당 종목 기록이 없으면 그 종목은 빈 문자열.
@@ -218,8 +224,25 @@ const RUN_SYSTEM = `너는 러닝 코치이자 건강 전문가다. 러닝 한 �
 - nextRun: 다음 러닝 구체 제안(종류, 거리·시간, 페이스 범위, 심박 범위). 회복 상태가 나쁘면 그에 맞춰 낮춘다.
 - caution: 부상·과훈련·건강 위험 신호가 있을 때만, 없으면 빈 문자열.`;
 
-const SLEEP_SCHEMA = objectOf(['headline', 'today', 'pattern', 'caution', 'tonight']);
+const SWIM_SYSTEM = `너는 수영 코치이자 건강 전문가다. 수영 한 번을 아주 자세히 분석한다.${COMMON}
+- 입력: swim(이번 수영 요약: 거리·시간·swimPer100m·poolLengthM·lengths), splits(100m 구간별 paceSecPerKm = 100m당 초, 마지막은 partialM 미터짜리 남은 구간일 수 있음), firstHalf/secondHalf(시간 기준 전반·후반 100m 페이스), laps(세트: type WORK=수영, RECOVERY=휴식, distanceM·movingSecs·paceSecPerKm=100m당 초), recentSwims(최근 수영 기록), recovery(그날 회복 상태), trainingPlanNotes(사용자가 공유한 훈련 계획 메모).
+- 페이스는 100m당 초를 'm:ss/100m'로 바꿔 말한다. 수영 심박은 손목 측정이라 없거나 부정확할 수 있으니 있으면 참고만 한다. 영법·스트로크 수 데이터는 없으니 추측하지 않는다.
+- 각 항목은 숫자를 근거로 2~4문장. 판단할 데이터가 없으면 빈 문자열.
+- summary: 어떤 성격의 수영(지구력·인터벌·회복 등)이었고 잘 됐는지.
+- pacing: 100m 구간 페이스 흐름(일정했는지, 후반 처짐 정도와 원인 추정).
+- sets: 세트·휴식 구성과 세트별 일관성. 세트 구분이 없으면 빈 문자열.
+- heartRate: 심박이 있으면 강도 평가, 없으면 빈 문자열.
+- technique: 페이스 처짐·세트 간 편차로 볼 때 보완할 점과 드릴 1~2개(예: 캐치업, 사이드킥).
+- comparison: recentSwims와 비교해 좋아진 점·아쉬운 점.
+- nextSwim: 다음 수영 세트를 구체적으로(워밍업·메인 세트 '8×100m @2:05 휴식 20초'·쿨다운, 총거리).
+- caution: 과훈련·건강 위험 신호가 있을 때만, 없으면 빈 문자열.`;
+
+const SLEEP_FIELDS = ['today', 'recovery', 'debt', 'pattern', 'training', 'supplements', 'tonight', 'caution'];
+const SLEEP_SCHEMA = objectOf(['headline', ...SLEEP_FIELDS]);
+// 수면 프롬프트를 바꾸면 올린다 → 같은 날 데이터라도 새 형식으로 다시 분석
+const SLEEP_PROMPT_VERSION = 2;
 const RUN_SCHEMA = objectOf(['summary', 'pacing', 'heartRate', 'form', 'intervals', 'comparison', 'nextRun', 'caution']);
+const SWIM_SCHEMA = objectOf(['summary', 'pacing', 'sets', 'heartRate', 'technique', 'comparison', 'nextSwim', 'caution']);
 const EXERCISE_SCHEMA = {
   type: 'OBJECT',
   properties: { warning: str, health: str, coach: objectOf(['all', 'run', 'trail', 'swim', 'strength']) },
@@ -241,6 +264,8 @@ function activityForAI(a) {
     pacePerKm: run && km && a.movingSecs ? paceStr(a.movingSecs / km) : null,
     gapPerKm: run && a.gap ? paceStr(1000 / a.gap) : null,
     swimPer100m: a.sport === 'swim' && a.distanceM && a.movingSecs ? paceStr(a.movingSecs / (a.distanceM / 100)) : null,
+    poolLengthM: a.sport === 'swim' ? a.poolLengthM ?? null : null,
+    lengths: a.sport === 'swim' ? a.lengths ?? null : null,
     avgHr: a.avgHr ? Math.round(a.avgHr) : null,
     maxHr: a.maxHr ?? null,
     cadence: a.cadence ? Math.round(a.cadence) : null,
@@ -280,14 +305,50 @@ function recoveryForAI(day) {
   };
 }
 
+const avgOf = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+// 수면 코칭이 근거로 쓸 통계 (AI가 계산하게 두지 않고 앱이 계산)
+function sleepStats(data, day) {
+  const nights = (n) => dateRange(day.date, n).map((d) => data.days[d]?.wellness).filter((w) => w?.sleepSecs != null);
+  const n7 = nights(7);
+  const n14 = nights(14);
+  const target = day.baseline?.sleepTargetSecs;
+  const b = day.baseline ?? {};
+  const pick = (ws, k) => ws.map((w) => w[k]).filter((v) => v != null);
+  const sleepMin14 = n14.map((w) => w.sleepSecs / 60);
+  const mean14 = avgOf(sleepMin14);
+  const std = mean14 == null ? null : Math.sqrt(avgOf(sleepMin14.map((m) => (m - mean14) ** 2)));
+  const weekend = (d) => [0, 6].includes(new Date(`${d}T00:00:00`).getDay());
+  const dated14 = dateRange(day.date, 14).map((d) => ({ d, w: data.days[d]?.wellness })).filter((x) => x.w?.sleepSecs != null);
+  const hrv7 = avgOf(pick(n7, 'hrv'));
+  const rhr7 = avgOf(pick(n7, 'restingHR'));
+  const sleep7 = avgOf(pick(n7, 'sleepSecs'));
+  return {
+    last7: { sleepMin: sleep7 == null ? null : r1(sleep7 / 60), sleepScore: r1(avgOf(pick(n7, 'sleepScore'))), hrv: r1(hrv7), restingHR: r1(rhr7), nights: n7.length },
+    sleepDebt7Min: target ? Math.round(n7.reduce((s, w) => s + Math.max(0, target - w.sleepSecs), 0) / 60) : null,
+    sleepStdMin: std == null ? null : Math.round(std),
+    weekdayAvgMin: r1(avgOf(dated14.filter((x) => !weekend(x.d)).map((x) => x.w.sleepSecs / 60))),
+    weekendAvgMin: r1(avgOf(dated14.filter((x) => weekend(x.d)).map((x) => x.w.sleepSecs / 60))),
+    hrvOnTargetNights: target ? r1(avgOf(n14.filter((w) => w.sleepSecs >= target && w.hrv != null).map((w) => w.hrv))) : null,
+    hrvOnShortNights: target ? r1(avgOf(n14.filter((w) => w.sleepSecs < target && w.hrv != null).map((w) => w.hrv))) : null,
+    hrv7vs30Pct: hrv7 != null && b.hrv30 ? r1(((hrv7 - b.hrv30) / b.hrv30) * 100) : null,
+    restingHR7vs30: rhr7 != null && b.restingHR30 != null ? r1(rhr7 - b.restingHR30) : null,
+  };
+}
+
 function sleepPayload(data, day) {
   const yesterday = addDays(day.date, -1);
   const taken = data.checkins[yesterday]?.supplements ?? {};
   return compact({
     ...recoveryForAI(day),
+    stats: sleepStats(data, day),
     last14Nights: dateRange(day.date, 14).map((d) => ({ date: d, ...wellnessForAI(data.days[d]?.wellness) })),
-    yesterdayTraining: data.activities.filter((a) => a.date === yesterday).map(activityForAI),
-    supplementsTakenYesterday: data.supplements.filter((s) => taken[s.id]?.taken).map((s) => s.name),
+    // 운동 끝난 시각이 수면에 영향 → 시작 시각과 시간을 함께
+    yesterdayTraining: data.activities.filter((a) => a.date === yesterday).map((a) => ({
+      ...activityForAI(a),
+      startTime: a.startLocal?.slice(11, 16) ?? null,
+    })),
+    supplementsTakenYesterday: data.supplements.filter((s) => taken[s.id]?.taken).map((s) => ({ name: s.name, slot: s.slot })),
     usualBedtime: data.settings.bedtime ?? null,
   });
 }
@@ -335,7 +396,7 @@ function sharedPlanNotes(data) {
 function sleepKey(day) {
   const w = day?.wellness;
   if (w?.sleepSecs == null) return null;
-  return [day.date, w.sleepSecs, w.sleepScore, w.hrv, w.restingHR, day.score?.total ?? '-'].join('|');
+  return [`v${SLEEP_PROMPT_VERSION}`, day.date, w.sleepSecs, w.sleepScore, w.hrv, w.restingHR, day.score?.total ?? '-'].join('|');
 }
 
 function exerciseKey(data) {
@@ -348,31 +409,39 @@ function exerciseKey(data) {
   return [data.today, ...ids, ...logs, ...notes].join('|');
 }
 
-// 러닝 한 번 상세 분석 → activities/{id}.ai, 계산한 스플릿 등은 .detail (다음에 열 때 다시 부르지 않음)
-export async function analyzeRun(fb, uid, data, activity, detail) {
+// 러닝·트레일·수영 한 번 상세 분석 → activities/{id}.ai, 계산한 스플릿 등은 .detail (다음에 열 때 다시 부르지 않음)
+export async function analyzeActivity(fb, uid, data, activity, detail) {
   const key = data.keys.geminiApiKey;
   if (!key) throw new Error('설정에서 Gemini API 키를 넣어 주세요.');
-  const recentRuns = data.activities
+  const swim = activity.sport === 'swim';
+  const recent = data.activities
     .filter((a) => a.id !== activity.id && a.sport === activity.sport && a.date <= activity.date)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 6)
     .map(activityForAI);
-  const payload = compact({
-    run: activityForAI(activity),
+  const common = {
     splits: detail.splits,
     firstHalf: detail.firstHalf,
     secondHalf: detail.secondHalf,
-    decouplingPct: detail.decouplingPct,
-    hrDriftBpm: detail.hrDriftBpm,
     // 랩 이름(label)은 사용자가 붙인 글일 수 있어 보내지 않는다
     laps: (detail.laps ?? []).map(({ label, ...l }) => l),
-    recentRuns,
     recovery: recoveryForAI(data.days[activity.date] ?? pickDisplayDay(data)),
-    zone2MaxHr: data.settings.zone2MaxHr ?? 140,
-    hrZoneUpperBpm: activity.hrZones ?? null,
     trainingPlanNotes: sharedPlanNotes(data),
-  });
-  const { model, result } = await generate(key, RUN_SYSTEM, payload, RUN_SCHEMA);
+  };
+  const payload = compact(swim
+    ? { swim: activityForAI(activity), ...common, recentSwims: recent }
+    : {
+      run: activityForAI(activity),
+      ...common,
+      decouplingPct: detail.decouplingPct,
+      hrDriftBpm: detail.hrDriftBpm,
+      recentRuns: recent,
+      zone2MaxHr: data.settings.zone2MaxHr ?? 140,
+      hrZoneUpperBpm: activity.hrZones ?? null,
+    });
+  const { model, result } = swim
+    ? await generate(key, SWIM_SYSTEM, payload, SWIM_SCHEMA)
+    : await generate(key, RUN_SYSTEM, payload, RUN_SCHEMA);
   const ai = { ...result, model };
   const { doc, setDoc, serverTimestamp } = fb.fs;
   await setDoc(doc(fb.db, 'users', uid, 'activities', activity.id),
@@ -396,7 +465,7 @@ export async function runCoaching(fb, uid, data, onResult = () => {}, onStart = 
       const { model, result } = await generate(key, SLEEP_SYSTEM, sleepPayload(data, day), SLEEP_SCHEMA);
       const ai = {
         headline: result.headline,
-        sleep: { today: result.today, pattern: result.pattern, caution: result.caution, tonight: result.tonight },
+        sleep: Object.fromEntries(SLEEP_FIELDS.map((k) => [k, result[k] ?? ''])),
         sleepKey: sk,
         model,
       };

@@ -4,6 +4,38 @@ import { localToday } from './format.js';
 
 const MEMO_LIMIT = 100;
 
+// 빠른 실행용 기기 저장본: 다음에 앱을 열면 이걸 먼저 보여 주고 최신 데이터로 바꾼다.
+// API 키는 넣지 않는다 (같은 github.io 주소의 다른 페이지와 저장소를 공유하므로 최소한만)
+const SNAPSHOT_KEY = 'health.snapshot.v1';
+
+export function saveSnapshot(user, data) {
+  try {
+    const { keys, ...rest } = data;
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+      uid: user.uid,
+      email: user.email ?? null,
+      data: { ...rest, lastSyncAt: data.lastSyncAt?.toISOString?.() ?? null },
+    }));
+  } catch { /* 저장 공간 부족 등 → 다음 실행이 조금 느릴 뿐 */ }
+}
+
+export function loadSnapshot() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SNAPSHOT_KEY));
+    if (!s?.uid || !s.data) return null;
+    s.data.lastSyncAt = s.data.lastSyncAt ? new Date(s.data.lastSyncAt) : null;
+    s.data.keys = {};
+    s.data.today = localToday();
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSnapshot() {
+  try { localStorage.removeItem(SNAPSHOT_KEY); } catch { /* 무시 */ }
+}
+
 // 권한 오류가 나도 화면 전체가 멈추지 않게 (규칙 재게시 전)
 function soft(promise) {
   return promise.catch((e) => {

@@ -1,11 +1,12 @@
 import { setCondition, conditionFromScore } from './theme.js';
 import { initFirebase } from './firebase.js';
 import {
-  deleteMemo, deleteStrength, loadAll, newMemoId, newStrengthId, newSupplementId, saveBodyBattery, saveKeys, saveMemo,
-  saveSettings, saveStrength, saveSupplement, saveSupplementDef, seedSupplements, sortStrength,
+  clearSnapshot, deleteMemo, deleteStrength, loadAll, loadSnapshot, newMemoId, newStrengthId, newSupplementId,
+  saveBodyBattery, saveKeys, saveMemo, saveSettings, saveSnapshot, saveStrength, saveSupplement, saveSupplementDef,
+  seedSupplements, sortStrength,
 } from './data.js';
 import { syncNow } from './sync.js';
-import { analyzeRun, diagnoseGemini, runCoaching } from './ai.js';
+import { analyzeActivity, diagnoseGemini, runCoaching } from './ai.js';
 import { IntervalsError, fetchActivityDetail } from './intervals.js';
 import { summarizeLaps, summarizeStreams } from './run.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
@@ -48,6 +49,11 @@ const state = {
   ui: { sleepRange: 'week', sport: 'all', feedback: 'health', runJobs: {}, memoFilter: 'all' },
 };
 
+// 로그인 확인이 끝나야 저장할 수 있다. 그 전(기기 저장 데이터로 먼저 보여 주는 동안)의 저장은 기다렸다가 실행
+let markReady;
+const ready = new Promise((r) => { markReady = r; });
+let isReady = false;
+
 const view = document.getElementById('view');
 const tabbar = document.querySelector('.tabbar');
 
@@ -79,7 +85,7 @@ function ensureMemoDraft(param) {
     : { key, id: null, text: '', kind: 'plan', shareAI: true };
 }
 
-// 러닝 상세 화면을 열면, 아직 분석이 없을 때 한 번 자동으로: 랩·스트림 받기 → 계산 → Gemini → 저장
+// 러닝·수영 상세 화면을 열면, 아직 분석이 없을 때 한 번 자동으로: 랩·스트림 받기 → 계산 → Gemini → 저장
 async function maybeAnalyzeRun(id) {
   const { data } = state;
   const a = data.activities.find((x) => x.id === id);
@@ -90,10 +96,12 @@ async function maybeAnalyzeRun(id) {
   try {
     let detail = a.detail;
     if (!detail) {
+      // 구간 단위: 러닝 1km, 수영 100m
+      const unit = a.sport === 'swim' ? 100 : 1000;
       const { intervals, streams } = await fetchActivityDetail({ apiKey: data.keys.intervalsApiKey }, id);
-      detail = { ...(summarizeStreams(streams) ?? {}), laps: summarizeLaps(intervals) };
+      detail = { unit, ...(summarizeStreams(streams, unit) ?? {}), laps: summarizeLaps(intervals, unit) };
     }
-    await analyzeRun(state.fb, state.user.uid, data, a, detail);
+    await analyzeActivity(state.fb, state.user.uid, data, a, detail);
     state.ui.runJobs[id] = { done: true };
   } catch (e) {
     console.error(e);
@@ -115,7 +123,7 @@ function render() {
   });
 
   if (state.user === undefined) { view.innerHTML = message('불러오는 중…'); return; }
-  if (!state.fb) { view.innerHTML = message('Firebase 설정 전이에요. app/js/firebase-config.js를 채워 주세요.'); return; }
+  if (!state.fb && !state.data) { view.innerHTML = message('Firebase 설정 전이에요. app/js/firebase-config.js를 채워 주세요.'); return; }
   if (!state.user) {
     setCondition('normal');
     view.innerHTML = renderLogin(state);
@@ -135,6 +143,15 @@ function render() {
 // 동기화 버튼: intervals.icu → 점수 → 저장 → 화면 갱신. 그다음 (새 데이터면) AI 코칭을 뒤에서 받아 채운다
 async function runSync() {
   if (state.sync.busy || state.sync.ai) return;
+  // 기기 저장 데이터로 보여 주는 중이면(키 없음) 최신 데이터를 먼저 받는다
+  if (state.stale) {
+    state.sync = { busy: true, ai: false, step: '불러오는 중…', message: null };
+    render();
+    await ready;
+    await state.refreshing;
+    state.sync = { busy: false, ai: false, step: null, message: null };
+    if (state.stale) { render(); return; }
+  }
   const { keys } = state.data;
   if (!keys.intervalsApiKey || !keys.intervalsAthleteId) {
     window.alert('설정에서 intervals.icu API 키와 Athlete ID를 먼저 넣어 주세요.');
@@ -146,6 +163,7 @@ async function runSync() {
   try {
     await syncNow(state.fb, state.user.uid, { keys, settings: state.data.settings, today: state.data.today });
     state.data = await loadAll(state.fb, state.user.uid);
+    saveSnapshot(state.user, state.data);
   } catch (e) {
     console.error(e);
     finishSync(e instanceof IntervalsError ? e.message
@@ -190,21 +208,31 @@ function finishSync(message) {
   }, message.includes('실패') || message.includes('못했') ? 12000 : 5000);
 }
 
-async function refresh() {
-  try {
-    state.data = await loadAll(state.fb, state.user.uid);
-    state.error = null;
-  } catch (e) {
-    console.error(e);
-    state.error = '데이터를 불러오지 못했어요. 네트워크를 확인해 주세요.';
-  }
-  render();
+// 최신 데이터를 받아 화면과 기기 저장본(다음 실행 때 바로 보여 줄 것)을 갱신
+function refresh() {
+  state.refreshing = (async () => {
+    try {
+      state.data = await loadAll(state.fb, state.user.uid);
+      state.stale = false;
+      state.error = null;
+      saveSnapshot(state.user, state.data);
+    } catch (e) {
+      console.error(e);
+      state.error = '데이터를 불러오지 못했어요. 네트워크를 확인해 주세요.';
+    }
+    render();
+  })();
+  return state.refreshing;
 }
 
 // 화면을 먼저 바꾸고(낙관적 업데이트) 저장. 실패하면 다시 불러온다
 // fn은 동기 부분에서 state를 바꾸고(예: setSupplement) 저장 Promise를 돌려준다.
 // 바뀐 state로 그리도록 fn을 먼저 실행한 뒤 render (반대로 하면 화면이 한 박자 늦게 보임)
 async function save(fn) {
+  if (!isReady) {
+    render();
+    await ready;
+  }
   let pending;
   try { pending = fn(); } catch (e) { pending = Promise.reject(e); }
   render();
@@ -323,7 +351,10 @@ const actions = {
     state.ui.aiTest = { busy: false, lines };
     render();
   },
-  logout: () => state.fb.au.signOut(state.fb.auth),
+  logout: () => {
+    clearSnapshot();
+    state.fb.au.signOut(state.fb.auth);
+  },
 };
 
 // 다시 그리지 않고 입력 중 상태만 갱신 (포커스 유지)
@@ -489,17 +520,32 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.user && !state.sync.busy && !state.sync.ai) refresh();
 });
 
+// 빠른 실행: 지난번 데이터를 기기에서 꺼내 바로 보여 주고, 로그인 확인·최신 데이터는 뒤에서
+const snapshot = loadSnapshot();
+if (snapshot) {
+  state.user = { uid: snapshot.uid, email: snapshot.email };
+  state.data = snapshot.data;
+  state.stale = true;
+}
 render();
 
 initFirebase()
   .then((fb) => {
     state.fb = fb;
-    if (!fb) { state.user = null; render(); return; }
+    if (!fb) { state.user = null; state.data = null; render(); return; }
     fb.au.onAuthStateChanged(fb.auth, (user) => {
+      const sameUser = !!user && state.data && state.user?.uid === user.uid;
       state.user = user;
-      state.data = null;
-      render();
-      if (user) refresh();
+      if (!user) {
+        clearSnapshot();
+        state.data = null;
+        render();
+        return;
+      }
+      if (!sameUser) { state.data = null; render(); }
+      isReady = true;
+      markReady();
+      refresh();
     });
   })
   .catch((e) => {
