@@ -9,6 +9,7 @@ import { syncNow } from './sync.js';
 import { analyzeActivity, diagnoseGemini, recoachExercise, runCoaching } from './ai.js';
 import { IntervalsError, fetchActivityDetail } from './intervals.js';
 import { summarizeLaps, summarizeStreams } from './run.js';
+import { emptyExercise, emptySet, parseStrengthText, setsOf } from './strength.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
 import { renderLogin, loginErrorText } from './screens/login.js';
@@ -63,7 +64,8 @@ function route() {
   return screens[name] ? { name, param: param ? decodeURIComponent(param) : null } : { name: 'today', param: null };
 }
 
-const emptyExercise = () => ({ name: '', weightKg: null, sets: null, reps: null });
+// 저장된 운동 → 입력용 복사본 (옛 형식도 세트 목록으로)
+const draftExercises = (list) => list.map((e) => ({ name: e.name, setList: setsOf(e).map((s) => ({ ...s })) }));
 
 // 헬스 기록 화면의 입력 중 상태. 같은 기록(또는 새 기록)이면 유지
 function ensureStrengthDraft(param) {
@@ -71,7 +73,7 @@ function ensureStrengthDraft(param) {
   if (state.ui.strengthDraft?.key === key) return;
   const log = param && state.data.strength.find((s) => s.id === param);
   state.ui.strengthDraft = log
-    ? { key, id: log.id, date: log.date, note: log.note ?? '', exercises: log.exercises.map((e) => ({ ...e })) }
+    ? { key, id: log.id, date: log.date, note: log.note ?? '', exercises: draftExercises(log.exercises) }
     : { key, id: null, date: state.data.today, note: '', exercises: [emptyExercise()] };
 }
 
@@ -332,7 +334,40 @@ const actions = {
   'strength-copy-last': () => {
     const d = state.ui.strengthDraft;
     const last = state.data.strength.find((s) => s.id !== d.id);
-    if (last) d.exercises = last.exercises.map((e) => ({ ...e }));
+    if (last) d.exercises = draftExercises(last.exercises);
+    render();
+  },
+  'strength-parse': () => {
+    const d = state.ui.strengthDraft;
+    const parsed = parseStrengthText(d.bulk ?? '');
+    if (!parsed.exercises.length) {
+      window.alert('운동을 읽지 못했어요. 운동 이름 다음 줄에 "40kg : 12개"처럼 적어 주세요.');
+      return;
+    }
+    // 빈 칸은 버리고 이미 적은 운동 뒤에 이어 붙인다
+    d.exercises = [...d.exercises.filter((e) => e.name.trim()), ...parsed.exercises];
+    if (parsed.date) d.date = parsed.date;
+    if (parsed.note && !d.note) d.note = parsed.note;
+    d.bulk = parsed.unparsed.join('\n');
+    render();
+    if (parsed.unparsed.length) window.alert(`읽지 못한 줄이 있어요. 입력칸에 남겨 뒀어요:\n${parsed.unparsed.join('\n')}`);
+  },
+  'strength-add-set': (el) => {
+    const { setList } = state.ui.strengthDraft.exercises[Number(el.dataset.i)];
+    // 마지막 세트 값을 복사해 두면 달라진 값만 고치면 된다
+    const prev = setList[setList.length - 1];
+    setList.push(prev ? { ...prev, warmup: false } : emptySet());
+    render();
+  },
+  'strength-remove-set': (el) => {
+    const { setList } = state.ui.strengthDraft.exercises[Number(el.dataset.i)];
+    setList.splice(Number(el.dataset.s), 1);
+    if (!setList.length) setList.push(emptySet());
+    render();
+  },
+  'strength-warmup': (el) => {
+    const s = state.ui.strengthDraft.exercises[Number(el.dataset.i)].setList[Number(el.dataset.s)];
+    s.warmup = !s.warmup;
     render();
   },
   'strength-delete': () => {
@@ -391,10 +426,11 @@ const inputs = {
   'memo-share': (el) => { state.ui.memoDraft.shareAI = el.checked; },
   'strength-date': (el) => { state.ui.strengthDraft.date = el.value; },
   'strength-note': (el) => { state.ui.strengthDraft.note = el.value; },
-  'strength-ex': (el) => {
-    const ex = state.ui.strengthDraft.exercises[Number(el.dataset.i)];
-    const field = el.dataset.field;
-    ex[field] = field === 'name' ? el.value : el.value === '' ? null : Number(el.value);
+  'strength-bulk': (el) => { state.ui.strengthDraft.bulk = el.value; },
+  'strength-name': (el) => { state.ui.strengthDraft.exercises[Number(el.dataset.i)].name = el.value; },
+  'strength-set': (el) => {
+    const s = state.ui.strengthDraft.exercises[Number(el.dataset.i)].setList[Number(el.dataset.s)];
+    s[el.dataset.field] = el.value === '' ? null : Number(el.value);
   },
 };
 
@@ -405,7 +441,12 @@ function submitStrength() {
     return int ? Math.round(v) : Math.round(v * 2) / 2;
   };
   const exercises = d.exercises
-    .map((e) => ({ name: e.name.trim(), weightKg: num(e.weightKg, false), sets: num(e.sets, true), reps: num(e.reps, true) }))
+    .map((e) => ({
+      name: e.name.trim(),
+      setList: e.setList
+        .map((s) => ({ weightKg: num(s.weightKg, false), reps: num(s.reps, true), warmup: !!s.warmup }))
+        .filter((s) => s.weightKg != null || s.reps != null),
+    }))
     .filter((e) => e.name);
   if (!exercises.length) { window.alert('운동 이름을 하나 이상 적어 주세요.'); return; }
   if (!d.date || d.date > state.data.today) { window.alert('날짜를 확인해 주세요.'); return; }

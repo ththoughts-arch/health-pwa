@@ -180,7 +180,8 @@ intervals.icu 활동 `id`를 문서 ID로 → 다시 수집해도 중복 없이 
   date: '2026-10-24',
   activityId: null,            // 같은 날 가민 'strength' 활동이 있으면 연결
   exercises: [
-    { name: '스쿼트', weightKg: 60, sets: 3, reps: 10 },
+    // 세트별 무게·횟수 (2026-11-05). 옛 기록 { name, weightKg, sets, reps }는 setsOf()가 펼쳐서 읽는다
+    { name: '평벤치 프레스', setList: [{ weightKg: 20, reps: 10, warmup: true }, { weightKg: 50, reps: 8, warmup: false }] },
   ],
   note: '',
   createdAt: Timestamp,

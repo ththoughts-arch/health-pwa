@@ -1,19 +1,19 @@
 import { esc, mmdd } from '../format.js';
 
-// 운동 한 줄 요약: '스쿼트 60kg 3×10'
-export function exerciseSummary(e) {
-  const kg = e.weightKg ? ` ${e.weightKg}kg` : '';
-  const sr = e.sets && e.reps ? ` ${e.sets}×${e.reps}` : e.sets ? ` ${e.sets}세트` : '';
-  return `${e.name}${kg}${sr}`;
-}
-
-function numField(i, field, value, unit, label, step = 1) {
+function setRow(s, i, j) {
+  const num = (field, value, label, step) => `
+    <input class="num-input" type="number" inputmode="${step < 1 ? 'decimal' : 'numeric'}" min="0" step="${step}"
+      value="${value ?? ''}" aria-label="${i + 1}번째 운동 ${j + 1}세트 ${label}"
+      data-input="strength-set" data-i="${i}" data-s="${j}" data-field="${field}">`;
   return `
-    <label class="ex-num">
-      <input class="num-input" type="number" inputmode="${step < 1 ? 'decimal' : 'numeric'}" min="0" step="${step}"
-        value="${value ?? ''}" aria-label="${label}" data-input="strength-ex" data-i="${i}" data-field="${field}">
-      <span class="sub">${unit}</span>
-    </label>`;
+    <div class="set-row">
+      <span class="num set-no">${j + 1}</span>
+      <label class="ex-num">${num('weightKg', s.weightKg, '무게', 0.5)}<span class="sub">kg</span></label>
+      <label class="ex-num">${num('reps', s.reps, '횟수', 1)}<span class="sub">회</span></label>
+      <button type="button" class="set-btn ${s.warmup ? 'is-on' : ''}" data-action="strength-warmup" data-i="${i}" data-s="${j}"
+        aria-pressed="${!!s.warmup}" aria-label="${j + 1}세트 워밍업">W</button>
+      <button type="button" class="set-btn" data-action="strength-remove-set" data-i="${i}" data-s="${j}" aria-label="${j + 1}세트 삭제">×</button>
+    </div>`;
 }
 
 // 입력은 state.ui.strengthDraft에 바로 반영(data-input), 저장은 제출 때
@@ -30,7 +30,7 @@ export function renderStrength({ data, ui }) {
         <span class="hero-date">STRENGTH</span>
       </div>
       <span class="hero-caption">${d.id ? '헬스 기록 수정' : '헬스 기록'}</span>
-      <span class="hero-msg">가민에는 무게·세트가 남지 않아서 직접 적어요. 무게가 없는 운동은 비워 두세요.</span>
+      <span class="hero-msg">가민에는 무게·세트가 남지 않아서 직접 적어요. 세트마다 무게와 횟수를 따로 적을 수 있어요.</span>
     </section>
 
     <form class="section strength-form" data-submit="strength-save">
@@ -38,6 +38,13 @@ export function renderStrength({ data, ui }) {
         <span class="setting-title">날짜</span>
         <input class="num-input date-input" type="date" value="${d.date}" max="${data.today}" required data-input="strength-date">
       </label>
+
+      <div class="bulk">
+        <span class="field-label">글로 한 번에 입력</span>
+        <textarea class="text-input memo-text" rows="5" aria-label="운동 기록 글" data-input="strength-bulk"
+          placeholder="평벤치 프레스&#10;빈바 : 10개&#10;40kg : 12개&#10;50kg : 8개&#10;&#10;또는 랫풀다운: 20×10, 35×10, 45×10">${esc(d.bulk ?? '')}</textarea>
+        <button type="button" class="ghost-btn" data-action="strength-parse">아래 칸에 채우기</button>
+      </div>
 
       ${last && !d.id && blank ? `
         <button type="button" class="ghost-btn copy-btn" data-action="strength-copy-last">
@@ -48,14 +55,11 @@ export function renderStrength({ data, ui }) {
         <div class="edit-row">
           <div class="edit-line">
             <input class="text-input edit-name" type="text" list="ex-names" maxlength="30" value="${esc(e.name)}"
-              placeholder="운동 이름 (예: 스쿼트)" aria-label="${i + 1}번째 운동 이름" data-input="strength-ex" data-i="${i}" data-field="name">
+              placeholder="운동 이름 (예: 스쿼트)" aria-label="${i + 1}번째 운동 이름" data-input="strength-name" data-i="${i}">
             ${d.exercises.length > 1 ? `<button type="button" class="ghost-btn ghost-btn-sm" data-action="strength-remove" data-i="${i}">삭제</button>` : ''}
           </div>
-          <div class="ex-nums">
-            ${numField(i, 'weightKg', e.weightKg, 'kg', `${i + 1}번째 운동 무게`, 0.5)}
-            ${numField(i, 'sets', e.sets, '세트', `${i + 1}번째 운동 세트 수`)}
-            ${numField(i, 'reps', e.reps, '회', `${i + 1}번째 운동 횟수`)}
-          </div>
+          ${e.setList.map((s, j) => setRow(s, i, j)).join('')}
+          <button type="button" class="ghost-btn ghost-btn-sm add-set-btn" data-action="strength-add-set" data-i="${i}">+ 세트</button>
         </div>`).join('')}
 
       <button type="button" class="ghost-btn add-row-btn" data-action="strength-add-row">+ 운동 추가</button>

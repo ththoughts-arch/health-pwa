@@ -1,7 +1,7 @@
 import { SPORT_LABEL, duration, esc, hm, mmdd, warningText } from '../format.js';
 import { activitiesBetween, intensity, pickDisplayDay, recommendedExercise } from '../model.js';
 import { addDays } from '../score.js';
-import { exerciseSummary } from './strength.js';
+import { exerciseSummary } from '../strength.js';
 import { syncButton } from './common.js';
 
 const FILTERS = [['all', '전체'], ['run', '러닝'], ['trail', '트레일'], ['swim', '수영'], ['strength', '헬스']];

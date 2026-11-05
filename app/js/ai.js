@@ -2,6 +2,7 @@
 // 이름·이메일·활동 제목·메모는 보내지 않고 수치와 종목·운동 이름만 보낸다.
 import { addDays } from './score.js';
 import { dateRange, pickDisplayDay } from './model.js';
+import { setsOf } from './strength.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -206,7 +207,7 @@ const EXERCISE_SYSTEM = `너는 두 역할을 한다.${COMMON}
 2) 종목 코치(coach): 기록을 보고 다음에 어떻게 할지 구체적으로 추천한다(거리·시간·페이스·심박 범위·세트 등). 각 2~3문장.
    - run(러닝)·trail(트레일): 페이스와 심박의 관계(같은 심박에서 페이스 변화), 존 분포, 케이던스, 인터벌 구성, 롱런 비중. 러닝이 가장 중요하니 가장 자세히.
    - swim(수영): 100m 페이스 변화와 후반 처짐, 세트 구성, 주간 거리·빈도. 다음 수영을 '8×100m @2:05 휴식 20초'처럼 세트로 적고 드릴 하나를 붙인다. 3~4문장.
-   - strength(헬스): 운동 종목·무게·세트×횟수의 진행, 러닝과의 균형.
+   - strength(헬스): strengthLogs의 세트별 kg·reps(warmup은 워밍업 세트라 본세트 평가에서 뺀다)로 본 종목별 무게·횟수 진행, 러닝과의 균형.
    - all: 종목 전체를 보는 이번 주 계획 요약.
    - 해당 종목 기록이 없으면 그 종목은 빈 문자열.
 - warning: 회복 지표가 나쁘거나 부하가 급증해 코치 추천보다 휴식이 먼저일 때만 1문장, 없으면 빈 문자열. 건강 경고가 코치 추천과 충돌하면 코치 문장도 그에 맞춰 낮춘다.
@@ -392,7 +393,10 @@ function exercisePayload(data, day) {
     activities: recent.map(activityForAI),
     strengthLogs: data.strength.filter((s) => s.date >= from).map((s) => ({
       date: s.date,
-      exercises: (s.exercises ?? []).map((e) => ({ name: e.name, kg: e.weightKg, sets: e.sets, reps: e.reps })),
+      exercises: (s.exercises ?? []).map((e) => ({
+        name: e.name,
+        sets: setsOf(e).map((x) => ({ kg: x.weightKg, reps: x.reps, warmup: x.warmup || null })),
+      })),
     })),
     trainingPlanNotes: sharedPlanNotes(data),
   });

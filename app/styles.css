@@ -358,6 +358,12 @@ p { margin: 0; }
 .link-inline { display: block; padding: 6px 0; text-decoration: underline; text-underline-offset: 3px; }
 
 /* 헬스 기록 */
+.bulk { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.set-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr) 44px 44px; align-items: center; gap: 6px; }
+.set-no { font-size: 13px; color: var(--muted); text-align: center; }
+.set-btn { height: 44px; border: 1px solid #DDDFE6; border-radius: 12px; background: #FFFFFF; font-size: 14px; color: var(--muted); cursor: pointer; }
+.set-btn.is-on { border-color: var(--ink); background: var(--ink); color: #FFFFFF; font-weight: 700; }
+.add-set-btn { align-self: flex-start; }
 .strength-form { padding-top: 4px; }
 .date-input { width: 160px; font-size: 16px; text-align: center; }
 .copy-btn { margin-top: 14px; text-align: left; line-height: 1.4; padding: 10px 16px; border-radius: 14px; }
