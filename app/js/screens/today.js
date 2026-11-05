@@ -1,5 +1,8 @@
 import { BAND_LABEL, SLEEP_QUALITY, duration, esc, heroDate, hm, mmdd, warningText } from '../format.js';
-import { activitiesBetween, headline, pickDisplayDay, recommendedExercise, sleepLabel, supplementSlots } from '../model.js';
+import {
+  activitiesBetween, headline, pickDisplayDay, recommendedExercise, sleepLabel, strengthLogsBetween, strengthSecs,
+  supplementSlots,
+} from '../model.js';
 import { addDays } from '../score.js';
 import { lastSyncText, syncButton } from './common.js';
 
@@ -30,7 +33,8 @@ export function renderToday(state) {
   ].filter(Boolean).join(' · ') || '수면 기록 없음';
 
   const weekSecs = activitiesBetween(data, addDays(data.today, -6), data.today)
-    .reduce((s, a) => s + (a.movingSecs ?? 0), 0);
+    .reduce((s, a) => s + (a.movingSecs ?? 0), 0)
+    + strengthSecs(strengthLogsBetween(data, addDays(data.today, -6), data.today));
 
   return `
     <section class="hero">

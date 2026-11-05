@@ -38,6 +38,17 @@ export function renderStrength({ data, ui }) {
         <span class="setting-title">날짜</span>
         <input class="num-input date-input" type="date" value="${d.date}" max="${data.today}" required data-input="strength-date">
       </label>
+      <label class="setting-row">
+        <span class="setting-text">
+          <span class="setting-title">운동 시간</span>
+          <span class="sub">최근 7일 운동 시간과 주 150분 목표에 더해져요</span>
+        </span>
+        <span class="ex-num duration-field">
+          <input class="num-input" type="number" inputmode="numeric" min="0" step="1" value="${d.durationMin ?? ''}"
+            aria-label="운동 시간(분)" data-input="strength-duration">
+          <span class="sub">분</span>
+        </span>
+      </label>
 
       <div class="bulk">
         <span class="field-label">글로 한 번에 입력</span>

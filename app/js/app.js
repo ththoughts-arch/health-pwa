@@ -73,7 +73,7 @@ function ensureStrengthDraft(param) {
   if (state.ui.strengthDraft?.key === key) return;
   const log = param && state.data.strength.find((s) => s.id === param);
   state.ui.strengthDraft = log
-    ? { key, id: log.id, date: log.date, note: log.note ?? '', exercises: draftExercises(log.exercises) }
+    ? { key, id: log.id, date: log.date, note: log.note ?? '', durationMin: log.durationMin ?? null, exercises: draftExercises(log.exercises) }
     : { key, id: null, date: state.data.today, note: '', exercises: [emptyExercise()] };
 }
 
@@ -348,6 +348,7 @@ const actions = {
     d.exercises = [...d.exercises.filter((e) => e.name.trim()), ...parsed.exercises];
     if (parsed.date) d.date = parsed.date;
     if (parsed.note && !d.note) d.note = parsed.note;
+    if (parsed.durationMin) d.durationMin = parsed.durationMin;
     d.bulk = parsed.unparsed.join('\n');
     render();
     if (parsed.unparsed.length) window.alert(`읽지 못한 줄이 있어요. 입력칸에 남겨 뒀어요:\n${parsed.unparsed.join('\n')}`);
@@ -427,6 +428,7 @@ const inputs = {
   'strength-date': (el) => { state.ui.strengthDraft.date = el.value; },
   'strength-note': (el) => { state.ui.strengthDraft.note = el.value; },
   'strength-bulk': (el) => { state.ui.strengthDraft.bulk = el.value; },
+  'strength-duration': (el) => { state.ui.strengthDraft.durationMin = el.value === '' ? null : Number(el.value); },
   'strength-name': (el) => { state.ui.strengthDraft.exercises[Number(el.dataset.i)].name = el.value; },
   'strength-set': (el) => {
     const s = state.ui.strengthDraft.exercises[Number(el.dataset.i)].setList[Number(el.dataset.s)];
@@ -453,7 +455,7 @@ function submitStrength() {
 
   // 같은 날 가민 헬스 활동이 있으면 연결 (운동 탭에서 한 줄로 표시)
   const act = state.data.activities.find((a) => a.date === d.date && a.sport === 'strength');
-  const entry = { date: d.date, exercises, note: d.note.trim(), activityId: act?.id ?? null };
+  const entry = { date: d.date, durationMin: num(d.durationMin, true), exercises, note: d.note.trim(), activityId: act?.id ?? null };
   const isNew = !d.id;
   const id = d.id ?? newStrengthId(state.fb, state.user.uid);
 

@@ -24,6 +24,12 @@ test('한 줄 형식 + 날짜·메모·첫 세트 워밍업, 소수 무게', () 
   assert.equal(r.exercises[0].setList[1].warmup, false);
 });
 
+test('첫 줄의 운동 시간(분)을 읽고 메모에서 뺀다', () => {
+  const r = parseStrengthText('2026-11-05 상체 60분 (첫 세트는 워밍업)\n스쿼트: 60×10');
+  assert.equal(r.durationMin, 60);
+  assert.equal(r.note, '상체');
+});
+
 test('읽지 못한 줄은 버리지 않고 알려 준다', () => {
   const r = parseStrengthText('40kg : 12개\n스쿼트\n60 x 10\n50\n런지');
   assert.deepEqual(pairs(r.exercises[0]), [[60, 10]]);

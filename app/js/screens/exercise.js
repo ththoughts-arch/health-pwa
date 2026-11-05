@@ -1,5 +1,7 @@
 import { SPORT_LABEL, duration, esc, hm, mmdd, warningText } from '../format.js';
-import { activitiesBetween, intensity, pickDisplayDay, recommendedExercise } from '../model.js';
+import {
+  activitiesBetween, intensity, pickDisplayDay, recommendedExercise, strengthLogsBetween, strengthSecs,
+} from '../model.js';
 import { addDays } from '../score.js';
 import { exerciseSummary } from '../strength.js';
 import { syncButton } from './common.js';
@@ -9,6 +11,7 @@ const COACH = { all: '종목 코치', run: '러닝 코치', trail: '트레일 �
 
 // 주간 목표(WHO 권장 중강도 주 150분) 진행률. 100%를 넘으면 막대 전체 길이를 늘려 넘친 만큼 보여 준다
 const WEEKLY_GOAL_MIN = 150;
+const goalNote = (diff) => (diff > 0 ? `${diff}분 초과` : diff < 0 ? `${-diff}분 남음` : '달성');
 function goalBar(secs) {
   const pct = Math.round((secs / 60 / WEEKLY_GOAL_MIN) * 100);
   const scale = Math.max(100, Math.ceil(pct / 10) * 10);   // 막대 끝 = 100% 또는 그 이상
@@ -20,7 +23,7 @@ function goalBar(secs) {
       </div>
       <div class="goal-labels">
         <span class="num goal-pct">${pct}%</span>
-        <span class="sub ink2">주 ${WEEKLY_GOAL_MIN}분 목표${pct >= 100 ? ` · ${Math.round(secs / 60 - WEEKLY_GOAL_MIN)}분 초과` : ` · ${Math.max(0, WEEKLY_GOAL_MIN - Math.round(secs / 60))}분 남음`}</span>
+        <span class="sub ink2">주 ${WEEKLY_GOAL_MIN}분 목표 · ${goalNote(Math.round(secs / 60) - WEEKLY_GOAL_MIN)}</span>
       </div>
     </div>`;
 }
@@ -39,8 +42,10 @@ export function renderExercise(state) {
   const thisWeek = activitiesBetween(data, from, data.today, sport);
   const lastWeek = activitiesBetween(data, addDays(data.today, -13), addDays(data.today, -7), sport);
   const secs = (acts) => acts.reduce((s, a) => s + (a.movingSecs ?? 0), 0);
-  const now = secs(thisWeek);
-  const before = secs(lastWeek);
+  const logsThisWeek = strengthLogsBetween(data, from, data.today, sport);
+  const logsLastWeek = strengthLogsBetween(data, addDays(data.today, -13), addDays(data.today, -7), sport);
+  const now = secs(thisWeek) + strengthSecs(logsThisWeek);
+  const before = secs(lastWeek) + strengthSecs(logsLastWeek);
   const change = before ? Math.round(((now - before) / before) * 100) : null;
   const dist = intensity(thisWeek);
 
@@ -60,7 +65,7 @@ export function renderExercise(state) {
         </div>
         <div class="hero-side">
           <span class="hero-change num">${change == null ? '—' : `${change > 0 ? '+' : ''}${change}%`}</span>
-          <span class="sub ink2">지난주 대비 · ${thisWeek.length}회</span>
+          <span class="sub ink2">지난주 대비 · ${thisWeek.length + logsThisWeek.length}회</span>
         </div>
       </div>
       ${goalBar(now)}
@@ -225,7 +230,7 @@ function strengthRow(log, act) {
         <span class="act-title">헬스${log.note ? ` · ${esc(log.note)}` : ''}</span>
         <span class="sub">${esc(meta)}</span>
       </span>
-      <span class="num act-big">${act?.movingSecs ? `${Math.round(act.movingSecs / 60)}′` : `${ex.length}종목`}</span>
+      <span class="num act-big">${act?.movingSecs ? `${Math.round(act.movingSecs / 60)}′` : log.durationMin ? `${log.durationMin}′` : `${ex.length}종목`}</span>
     </a>`;
 }
 

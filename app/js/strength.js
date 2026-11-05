@@ -49,9 +49,9 @@ function parseSetList(text) {
 //   평벤치 프레스          - 평벤치 프레스: 20×10, 40×12, 50×8
 //   빈바 : 10개
 //   40kg : 12개
-// 첫 줄이 '2026-11-05 상체 (첫 세트는 워밍업)'이면 날짜·메모·워밍업까지 읽는다
+// 첫 줄이 '2026-11-05 상체 60분 (첫 세트는 워밍업)'이면 날짜·메모·운동 시간·워밍업까지 읽는다
 export function parseStrengthText(text) {
-  const out = { date: null, note: null, exercises: [], unparsed: [] };
+  const out = { date: null, note: null, durationMin: null, exercises: [], unparsed: [] };
   let warmupFirst = false;
   let current = null;
 
@@ -63,7 +63,10 @@ export function parseStrengthText(text) {
     if (date) {
       out.date = `${date[1]}-${date[2].padStart(2, '0')}-${date[3].padStart(2, '0')}`;
       warmupFirst = /첫\s*세트.*워밍업/.test(date[4]);
-      out.note = date[4].replace(/[(（].*?[)）]/g, '').trim() || null;
+      const rest = date[4].replace(/[(（].*?[)）]/g, '');
+      const mins = rest.match(/(\d+)\s*분/);
+      if (mins) out.durationMin = Number(mins[1]);
+      out.note = rest.replace(/\d+\s*분/, '').trim() || null;
       continue;
     }
 

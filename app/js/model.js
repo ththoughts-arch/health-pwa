@@ -93,6 +93,16 @@ export function activitiesBetween(data, from, to, sport = 'all') {
   return data.activities.filter((a) => a.date >= from && a.date <= to && (sport === 'all' || a.sport === sport));
 }
 
+// 헬스 수동 기록. 가민 활동과 연결된 기록은 활동 쪽에서 세므로 뺀다
+export function strengthLogsBetween(data, from, to, sport = 'all') {
+  if (sport !== 'all' && sport !== 'strength') return [];
+  return data.strength.filter((s) => s.date >= from && s.date <= to && !s.activityId);
+}
+
+export function strengthSecs(logs) {
+  return logs.reduce((sum, s) => sum + (s.durationMin ?? 0) * 60, 0);
+}
+
 // 강도 분포: 쉬움 = 존1–2, 보통 = 존3, 고강도 = 존4 이상
 export function intensity(acts) {
   let easy = 0;
