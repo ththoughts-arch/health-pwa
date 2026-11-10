@@ -367,6 +367,9 @@ p { margin: 0; }
 .set-btn.is-on { border-color: var(--ink); background: var(--ink); color: #FFFFFF; font-weight: 700; }
 .add-set-btn { align-self: flex-start; }
 .duration-field { width: 104px; flex-shrink: 0; }
+.form-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 4px; }
+.form-actions .ghost-btn { min-height: 52px; border-radius: 14px; }
+.form-actions .primary-btn { margin-top: 0; }
 .strength-form { padding-top: 4px; }
 .date-input { width: 160px; font-size: 16px; text-align: center; }
 .copy-btn { margin-top: 14px; text-align: left; line-height: 1.4; padding: 10px 16px; border-radius: 14px; }

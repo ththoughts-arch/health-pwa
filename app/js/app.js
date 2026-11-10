@@ -372,6 +372,12 @@ const actions = {
     s.warmup = !s.warmup;
     render();
   },
+  'strength-cancel': () => {
+    const d = state.ui.strengthDraft;
+    if (d?.dirty && !window.confirm('작성 중인 내용을 버릴까요?')) return;
+    state.ui.strengthDraft = null;
+    location.hash = '#exercise';
+  },
   'strength-delete': () => {
     const d = state.ui.strengthDraft;
     if (!window.confirm('이 헬스 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
@@ -510,9 +516,16 @@ const changes = {
   },
 };
 
+// 헬스 기록 화면에서 무언가 바꿨는지 (취소할 때 확인용)
+const STRENGTH_EDIT_ACTIONS = new Set([
+  'strength-parse', 'strength-add-set', 'strength-remove-set', 'strength-warmup', 'strength-add-row', 'strength-remove', 'strength-copy-last',
+]);
+
 view.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
-  if (el) actions[el.dataset.action]?.(el);
+  if (!el) return;
+  if (STRENGTH_EDIT_ACTIONS.has(el.dataset.action) && state.ui.strengthDraft) state.ui.strengthDraft.dirty = true;
+  actions[el.dataset.action]?.(el);
 });
 
 view.addEventListener('change', (e) => {
@@ -522,7 +535,9 @@ view.addEventListener('change', (e) => {
 
 view.addEventListener('input', (e) => {
   const el = e.target.closest('[data-input]');
-  if (el) inputs[el.dataset.input]?.(el);
+  if (!el) return;
+  if (el.dataset.input.startsWith('strength-') && state.ui.strengthDraft) state.ui.strengthDraft.dirty = true;
+  inputs[el.dataset.input]?.(el);
 });
 
 view.addEventListener('submit', async (e) => {

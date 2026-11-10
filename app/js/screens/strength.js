@@ -81,7 +81,10 @@ export function renderStrength({ data, ui }) {
       </label>
       <datalist id="ex-names">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
 
-      <button type="submit" class="primary-btn">저장</button>
+      <div class="form-actions">
+        <button type="button" class="ghost-btn" data-action="strength-cancel">취소</button>
+        <button type="submit" class="primary-btn">저장</button>
+      </div>
       ${d.id ? '<button type="button" class="ghost-btn danger-btn" data-action="strength-delete">이 기록 삭제</button>' : ''}
     </form>`;
 }
