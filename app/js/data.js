@@ -52,7 +52,7 @@ export async function loadAll(fb, uid) {
     collection(user, name), where('date', '>=', addDays(today, -days + 1)), orderBy('date'),
   ));
 
-  const [profile, days, activities, checkins, supplements, strength, keys, coach, memos] = await Promise.all([
+  const [profile, days, activities, checkins, supplements, strength, keys, coach, memos, dayGuide] = await Promise.all([
     getDoc(user),
     since('days', 31),
     since('activities', 28),
@@ -62,6 +62,7 @@ export async function loadAll(fb, uid) {
     soft(getDoc(doc(user, 'private', 'keys'))),
     soft(getDoc(doc(user, 'coach', 'exercise'))),
     soft(getDocs(query(collection(user, 'memos'), orderBy('createdAt', 'desc'), fb.fs.limit(MEMO_LIMIT)))),
+    soft(getDoc(doc(user, 'coach', 'day'))),
   ]);
 
   const byDate = (snap) => Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
@@ -74,6 +75,8 @@ export async function loadAll(fb, uid) {
     memos: (memos.docs ?? []).map((d) => ({ id: d.id, ...d.data() })),
     keys: keys.data() ?? {},
     exerciseCoach: coach.data() ?? null,
+    // 남은 하루 가이드 (coach/day, 최신 1개)
+    dayGuide: dayGuide.data() ?? null,
     days: byDate(days),
     activities: activities.docs.map((d) => ({ id: d.id, ...d.data() })),
     checkins: byDate(checkins),

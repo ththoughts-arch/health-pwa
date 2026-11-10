@@ -1,7 +1,8 @@
 // Gemini 코칭 (CLAUDE.md 4장·5장). 무료 플랜은 입력이 학습에 쓰일 수 있으므로
 // 이름·이메일·활동 제목·메모는 보내지 않고 수치와 종목·운동 이름만 보낸다.
 import { addDays } from './score.js';
-import { dateRange, pickDisplayDay, strengthLogsBetween, strengthSecs } from './model.js';
+import { dateRange, pickDisplayDay, strengthLogsBetween, strengthSecs, tonightBedtime } from './model.js';
+import { shiftTime } from './format.js';
 import { setsOf } from './strength.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
@@ -245,6 +246,17 @@ const SWIM_SYSTEM = `너는 수영 코치이자 건강 전문가다. 수영 한 
 - nextSwim: 다음 수영 세트를 구체적으로(워밍업·메인 세트 '8×100m @2:05 휴식 20초'·쿨다운, 총거리).
 - caution: 과훈련·건강 위험 신호가 있을 때만, 없으면 빈 문자열.`;
 
+const DAY_SYSTEM = `너는 이 사람의 하루를 건강 관점에서 챙겨 주는 코치다.${COMMON}
+- now(현재 시각 HH:MM)부터 잠들 때까지 남은 하루를 어떻게 보내면 좋을지 말한다. 이미 지난 시간대 이야기는 하지 않는다. 늦은 밤이면 잠자리 준비에 집중한다.
+- 입력: now, weekday, condition(오늘 컨디션 점수·구간·경고, 어젯밤 수면·HRV·안정시 심박과 평소 기준), sleepDebt7Min(최근 7일 수면 빚, 분), doneToday(오늘 이미 한 운동·헬스), plannedWorkout(오늘의 운동 계획, 없을 수 있음), weekMinutes(최근 7일 운동 시간, 목표 주 150분), supplementsLeft(아직 안 먹은 영양제의 시간대·알림 시각), tonightBedtime(오늘 밤 권장 잠드는 시각), usualBedtime.
+- 식사는 이 앱에서 기록하지 않으니 식단 처방은 하지 않는다(수분·카페인 정도는 괜찮다).
+- headline: 지금 상태 한 줄 요약과 남은 하루의 핵심(45자 안팎).
+- exercise: 남은 운동을 할지, 한다면 언제·어떤 강도·얼마나. 이미 했으면 회복(스트레칭·가벼운 걷기 등). 1~2문장.
+- supplements: 남은 영양제를 언제 먹을지. 남은 게 없으면 빈 문자열.
+- evening: 저녁부터 잠들 때까지 카페인 마감 시각, 저녁 운동 강도, 화면 끄는 시각, 잠드는 시각. 1~2문장.
+- caution: 회복 경고 등 주의가 필요할 때만 1문장, 없으면 빈 문자열.`;
+const DAY_SCHEMA = objectOf(['headline', 'exercise', 'supplements', 'evening', 'caution']);
+
 const SLEEP_FIELDS = ['today', 'recovery', 'debt', 'pattern', 'training', 'supplements', 'tonight', 'caution'];
 const SLEEP_SCHEMA = objectOf(['headline', ...SLEEP_FIELDS]);
 // 수면 프롬프트를 바꾸면 올린다 → 같은 날 데이터라도 새 형식으로 다시 분석
@@ -441,6 +453,55 @@ async function coachExercise(fb, uid, data, day, key) {
 }
 
 // 공유 메모를 저장·삭제했을 때: 운동 기록 변화와 상관없이 바로 다시 코칭
+// ── 남은 하루 가이드 (동기화 때, 현재 시각 기준) ──
+const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+function dayPayload(data, day, now) {
+  const { today } = data;
+  const taken = data.checkins[today]?.supplements ?? {};
+  const weekFrom = addDays(today, -6);
+  const weekSecs = data.activities.filter((a) => a.date >= weekFrom && a.date <= today).reduce((s, a) => s + (a.movingSecs ?? 0), 0)
+    + strengthSecs(strengthLogsBetween(data, weekFrom, today));
+  const bed = tonightBedtime(data.settings, day);
+  return compact({
+    now: hhmm(now),
+    weekday: ['일', '월', '화', '수', '목', '금', '토'][now.getDay()],
+    condition: recoveryForAI(day),
+    sleepDebt7Min: day ? sleepStats(data, day).sleepDebt7Min : null,
+    doneToday: {
+      activities: data.activities.filter((a) => a.date === today)
+        .map((a) => ({ ...activityForAI(a), startTime: a.startLocal?.slice(11, 16) ?? null })),
+      strength: data.strength.filter((s) => s.date === today)
+        .map((s) => ({ minutes: s.durationMin ?? null, exercises: (s.exercises ?? []).map((e) => e.name) })),
+    },
+    plannedWorkout: data.exerciseCoach?.date === today ? data.exerciseCoach.todayWorkout ?? null : null,
+    weekMinutes: Math.round(weekSecs / 60),
+    supplementsLeft: data.supplements.filter((s) => !taken[s.id]?.taken).map((s) => ({ name: s.name, slot: s.slot, time: s.time ?? null })),
+    tonightBedtime: bed ? shiftTime(data.settings.bedtime, -bed.earlier) : null,
+    usualBedtime: data.settings.bedtime ?? null,
+  });
+}
+
+// 같은 시간대(시)에 오늘 운동·헬스·영양제·점수·계획이 그대로면 다시 부르지 않는다
+function dayKey(data, day, now) {
+  const { today } = data;
+  const taken = Object.entries(data.checkins[today]?.supplements ?? {}).filter(([, v]) => v?.taken).map(([id]) => id).sort();
+  return [
+    today, now.getHours(),
+    ...data.activities.filter((a) => a.date === today).map((a) => a.id).sort(),
+    ...data.strength.filter((s) => s.date === today).map((s) => `${s.id}:${s.durationMin ?? ''}`).sort(),
+    `s:${taken.join(',')}`, day?.score?.total ?? '-', data.exerciseCoach?.todayWorkout?.title ?? '-',
+  ].join('|');
+}
+
+async function guideDay(fb, uid, data, day, key, now) {
+  const { doc, setDoc, serverTimestamp } = fb.fs;
+  const { model, result } = await generate(data.keys.geminiApiKey, DAY_SYSTEM, dayPayload(data, day, now), DAY_SCHEMA);
+  const guide = { ...result, key, date: data.today, time: hhmm(now), model };
+  await setDoc(doc(fb.db, 'users', uid, 'coach', 'day'), { ...guide, createdAt: serverTimestamp() });
+  data.dayGuide = { ...guide, createdAt: new Date() };
+}
+
 export async function recoachExercise(fb, uid, data) {
   if (!data.keys.geminiApiKey) throw new Error('설정에서 Gemini API 키를 넣어 주세요.');
   await coachExercise(fb, uid, data, pickDisplayDay(data), exerciseKey(data) ?? data.today);
@@ -516,18 +577,26 @@ export async function runCoaching(fb, uid, data, onResult = () => {}, onStart = 
     tasks.push(['exercise', () => coachExercise(fb, uid, data, day, ek)]);
   }
 
+  // 남은 하루 가이드는 오늘의 운동 계획을 참고하므로 다른 분석이 끝난 뒤에
+  const now = new Date();
+  const dk = dayKey(data, day, now);
+  const needDay = data.dayGuide?.key !== dk;
+
   const done = [];
   const errors = [];
-  onStart(tasks.map(([kind]) => kind));
-  await Promise.all(tasks.map(async ([kind, run]) => {
+  const label = { sleep: '수면', exercise: '운동', day: '하루 가이드' };
+  const runTask = async ([kind, run]) => {
     try {
       await run();
       done.push(kind);
       onResult(kind);
     } catch (e) {
       console.error(e);
-      errors.push(`${kind === 'sleep' ? '수면' : '운동'}: ${e.message}`);
+      errors.push(`${label[kind]}: ${e.message}`);
     }
-  }));
-  return { done, errors, pending: tasks.length };
+  };
+  onStart([...tasks.map(([kind]) => kind), ...(needDay ? ['day'] : [])]);
+  await Promise.all(tasks.map(runTask));
+  if (needDay) await runTask(['day', () => guideDay(fb, uid, data, day, dayKey(data, day, now), now)]);
+  return { done, errors, pending: tasks.length + (needDay ? 1 : 0) };
 }

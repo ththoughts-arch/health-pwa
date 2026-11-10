@@ -195,7 +195,8 @@ async function runSync() {
     result = { done: [], errors: [e.message], pending: 1 };
   }
   const parts = [];
-  if (result.done.length) parts.push(`AI ${result.done.map((d) => (d === 'sleep' ? '수면 분석' : '운동 코칭')).join('·')} 받았어요`);
+  const doneLabel = { sleep: '수면 분석', exercise: '운동 코칭', day: '하루 가이드' };
+  if (result.done.length) parts.push(`AI ${result.done.map((d) => doneLabel[d]).join('·')} 받았어요`);
   if (result.errors.length) parts.push(`AI 분석 실패: ${result.errors.join(' / ')}`);
   finishSync(parts.join(' · ') || null);
 }
@@ -341,7 +342,7 @@ const actions = {
     const d = state.ui.strengthDraft;
     const parsed = parseStrengthText(d.bulk ?? '');
     if (!parsed.exercises.length) {
-      window.alert('운동을 읽지 못했어요. 운동 이름 다음 줄에 "40kg : 12개"처럼 적어 주세요.');
+      window.alert('운동을 읽지 못했어요. 운동 이름 다음 줄에 "40kg : 12개" 또는 "40kg×12, 50kg×8"처럼 적어 주세요.');
       return;
     }
     // 빈 칸은 버리고 이미 적은 운동 뒤에 이어 붙인다

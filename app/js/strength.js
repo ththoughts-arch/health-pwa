@@ -39,15 +39,35 @@ function toSet(weight, reps) {
   return { weightKg, reps: Number(reps), warmup: false };
 }
 
-function parseSetList(text) {
-  const tokens = text.split(/[,，/]/).map((t) => t.trim()).filter(Boolean);
-  const sets = tokens.map((t) => t.match(SET_TOKEN));
-  return sets.length && sets.every(Boolean) ? sets.map((m) => toSet(m[1], m[2])) : null;
+const WARMUP = /워밍업|웜업|warm-?up/i;
+
+// 세트 하나에서 괄호 메모를 떼어 낸다: '빈바×8(워밍업)' → 세트 + 워밍업, '20kg×10 (팔마다)' → 세트 + 메모 '팔마다'
+function splitNotes(token) {
+  const notes = [...token.matchAll(/[(（]([^)）]*)[)）]/g)].map((m) => m[1].trim()).filter(Boolean);
+  const bare = token.replace(/[(（][^)）]*[)）]/g, '').replace(WARMUP, '').trim();
+  return { bare, warmup: WARMUP.test(token), notes: notes.filter((n) => !WARMUP.test(n)) };
 }
 
-// 붙여넣은 글 → 기록. 두 가지 형식을 섞어 쓸 수 있다
-//   평벤치 프레스          - 평벤치 프레스: 20×10, 40×12, 50×8
-//   빈바 : 10개
+// '20×10, 40×12 (팔마다)' → { sets, notes }. 모든 조각이 세트여야 세트 목록으로 본다
+function parseSetList(text) {
+  const tokens = text.split(/[,，/]/).map((t) => t.trim()).filter(Boolean);
+  const parts = tokens.map(splitNotes);
+  const matches = parts.map((p) => p.bare.match(SET_TOKEN));
+  if (!matches.length || !matches.every(Boolean)) return null;
+  return {
+    sets: matches.map((m, i) => ({ ...toSet(m[1], m[2]), warmup: parts[i].warmup })),
+    notes: parts.flatMap((p) => p.notes),
+  };
+}
+
+// 운동 이름 뒤에 괄호 메모 붙이기 (이미 있으면 그대로)
+function addNotes(exercise, notes) {
+  for (const n of notes) if (!exercise.name.includes(n)) exercise.name += ` (${n})`;
+}
+
+// 붙여넣은 글 → 기록. 세 가지 형식을 섞어 쓸 수 있다
+//   평벤치 프레스          평벤치 프레스                         - 평벤치 프레스: 20×10, 40×12, 50×8
+//   빈바 : 10개            빈바×8(워밍업), 50kg×8, 40kg×8
 //   40kg : 12개
 // 첫 줄이 '2026-11-05 상체 60분 (첫 세트는 워밍업)'이면 날짜·메모·운동 시간·워밍업까지 읽는다
 export function parseStrengthText(text) {
@@ -70,17 +90,23 @@ export function parseStrengthText(text) {
       continue;
     }
 
-    const set = line.match(SET_LINE);
-    if (set) {
-      if (current) current.setList.push(toSet(set[1], set[2]));
-      else out.unparsed.push(line);
+    // 세트만 있는 줄 (한 세트 '40kg : 12개' 또는 여러 세트 '빈바×8(워밍업), 50kg×8') → 위 운동에 붙인다
+    const one = splitNotes(line);
+    const single = one.bare.match(SET_LINE);
+    const list = single ? null : parseSetList(line);
+    if (single || list) {
+      if (!current) { out.unparsed.push(line); continue; }
+      if (single) current.setList.push({ ...toSet(single[1], single[2]), warmup: one.warmup });
+      else current.setList.push(...list.sets);
+      addNotes(current, single ? one.notes : list.notes);
       continue;
     }
 
     const colon = line.search(/[:：]/);
     const inline = colon > 0 ? parseSetList(line.slice(colon + 1)) : null;
     if (inline) {
-      current = { name: line.slice(0, colon).trim(), setList: inline };
+      current = { name: line.slice(0, colon).trim(), setList: inline.sets };
+      addNotes(current, inline.notes);
       out.exercises.push(current);
     } else if (/^\d/.test(line)) {
       out.unparsed.push(line);   // 숫자로 시작하는데 세트 형식이 아님 → 운동 이름으로 넣지 않는다
@@ -95,6 +121,7 @@ export function parseStrengthText(text) {
     out.unparsed.push(e.name);   // 세트가 없는 이름 줄
     return false;
   });
-  if (warmupFirst) for (const e of out.exercises) e.setList[0].warmup = true;
+  // '첫 세트는 워밍업' 표시가 있으면, 워밍업 표시가 하나도 없는 운동의 첫 세트를 워밍업으로
+  if (warmupFirst) for (const e of out.exercises) if (!e.setList.some((s) => s.warmup)) e.setList[0].warmup = true;
   return out;
 }

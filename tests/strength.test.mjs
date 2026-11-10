@@ -24,6 +24,18 @@ test('한 줄 형식 + 날짜·메모·첫 세트 워밍업, 소수 무게', () 
   assert.equal(r.exercises[0].setList[1].warmup, false);
 });
 
+test('운동 이름 다음 줄에 세트를 쉼표로 나열, 괄호 메모(워밍업·팔마다)', () => {
+  const r = parseStrengthText(`평벤치 프레스
+빈바×8(워밍업), 50kg×8, 50kg×8, 40kg×8
+원암 로우(로우로우 머신)
+20kg×10, 20kg×10, 20kg×10 (팔마다)`);
+  assert.deepEqual(r.unparsed, []);
+  assert.deepEqual(pairs(r.exercises[0]), [[20, 8], [50, 8], [50, 8], [40, 8]]);
+  assert.deepEqual(r.exercises[0].setList.map((s) => s.warmup), [true, false, false, false]);
+  assert.equal(r.exercises[1].name, '원암 로우(로우로우 머신) (팔마다)');
+  assert.deepEqual(pairs(r.exercises[1]), [[20, 10], [20, 10], [20, 10]]);
+});
+
 test('첫 줄의 운동 시간(분)을 읽고 메모에서 뺀다', () => {
   const r = parseStrengthText('2026-11-05 상체 60분 (첫 세트는 워밍업)\n스쿼트: 60×10');
   assert.equal(r.durationMin, 60);

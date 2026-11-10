@@ -296,6 +296,8 @@ p { margin: 0; }
 }
 .key-row { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .ai-meta { padding-top: 10px; }
+.guide { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.guide-headline { font-size: 16px; font-weight: 700; line-height: 1.55; padding-bottom: 4px; }
 .today-workout { margin: 0 0 6px; gap: 8px; }
 .tw-head { padding-bottom: 0; }
 .tw-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--accent-text); }

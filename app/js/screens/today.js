@@ -8,6 +8,30 @@ import { lastSyncText, syncButton } from './common.js';
 
 const GEAR = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1B25" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
 
+// 남은 하루 가이드 (coach/day): 동기화한 시각 기준으로 지금부터 잠들 때까지
+function dayGuide(data, sync) {
+  const g = data.dayGuide;
+  const busy = sync?.ai && sync.pending?.includes('day');
+  const fresh = g?.date === data.today;
+  let body;
+  if (fresh) {
+    const rows = [['운동', g.exercise, false], ['영양제', g.supplements, false], ['저녁', g.evening, false], ['주의', g.caution, true]]
+      .filter(([, text]) => text);
+    body = `
+      <p class="guide-headline">${esc(g.headline)}</p>
+      ${rows.map(([k, text, warn]) => `
+        <div class="ai-row"><span class="ai-key ${warn ? 'is-warn' : 'accent'}">${k}</span><span class="ai-text">${esc(text)}</span></div>`).join('')}`;
+  } else {
+    body = `<p class="sub">${busy ? '지금 상태에 맞춘 가이드를 만드는 중이에요…' : '동기화하면 지금 시각과 컨디션에 맞춰 남은 하루를 어떻게 보낼지 알려 드려요.'}</p>`;
+  }
+  const meta = busy ? '새로 만드는 중…' : fresh ? `${g.time} 기준` : '';
+  return `
+    <div class="block guide">
+      <div class="block-head"><span class="block-title">남은 하루</span><span class="sub">${meta}</span></div>
+      ${body}
+    </div>`;
+}
+
 export function renderToday(state) {
   const { data } = state;
   const day = pickDisplayDay(data);
@@ -56,6 +80,7 @@ export function renderToday(state) {
     </section>
 
     <div class="section">
+      ${dayGuide(data, state.sync)}
       ${warnings}
 
       <div class="bb-row">
