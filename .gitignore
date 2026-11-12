@@ -15,3 +15,6 @@ node_modules/
 package-lock.json
 .DS_Store
 Thumbs.db
+
+# graphify 지식 그래프 결과물 (로컬에서만 사용)
+graphify-out/
