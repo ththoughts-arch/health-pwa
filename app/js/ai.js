@@ -78,18 +78,21 @@ function parseResult(json) {
 }
 
 // 응답 지연·연결 끊김: 키·요청 문제가 아니라 다시 하면 될 수 있는 실패
-export class TransientError extends Error {
+class TransientError extends Error {
   constructor(message) {
     super(message);
     this.transient = true;
   }
 }
 
-async function callModel(key, model, body) {
+// deadline: 분석 하나 전체의 마감 시각(ms). 한 번 호출은 90초와 남은 시간 중 짧은 쪽까지만 기다린다
+async function callModel(key, model, body, deadline) {
   for (let attempt = 0; ; attempt++) {
+    const timeoutMs = Math.min(CALL_TIMEOUT_MS, deadline - Date.now());
+    if (timeoutMs <= 0) throw new TransientError('정해진 시간 안에 응답이 없어요');
     // 한 번 호출이 너무 오래 걸리면 끊고 다음 모델로 (generate에서 처리)
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), CALL_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     let res;
     try {
       res = await fetch(`${API}/${model}:generateContent`, {
@@ -99,7 +102,7 @@ async function callModel(key, model, body) {
         signal: ctrl.signal,
       });
     } catch (e) {
-      if (e.name === 'AbortError') throw new TransientError(`${CALL_TIMEOUT_MS / 1000}초 안에 응답이 없어요`);
+      if (e.name === 'AbortError') throw new TransientError(`${Math.round(timeoutMs / 1000)}초 안에 응답이 없어요`);
       // 연결 끊김(Failed to fetch 등): 앱을 내렸거나 네트워크가 바뀐 경우가 많다 → 잠깐 뒤 같은 모델로 다시
       if (attempt >= RETRY_WAITS_MS.length) throw new TransientError('네트워크 연결이 끊겼어요');
       await sleep(RETRY_WAITS_MS[attempt]);
@@ -133,28 +136,28 @@ function requestBody(system, payload, schema, withThinking) {
   });
 }
 
-async function callWithThinkingFallback(key, model, system, payload, schema) {
+async function callWithThinkingFallback(key, model, system, payload, schema, deadline) {
   if (!noThinkingConfig.has(model)) {
     try {
-      return await callModel(key, model, requestBody(system, payload, schema, true));
+      return await callModel(key, model, requestBody(system, payload, schema, true), deadline);
     } catch (e) {
       if (!(e instanceof GeminiError && e.status === 400 && /thinking/i.test(e.detail))) throw e;
       noThinkingConfig.add(model);
     }
   }
-  return callModel(key, model, requestBody(system, payload, schema, false));
+  return callModel(key, model, requestBody(system, payload, schema, false), deadline);
 }
 
 async function generate(key, system, payload, schema) {
   const models = await candidateModels(key);
   const errors = [];
-  const started = Date.now();
+  const deadline = Date.now() + GENERATE_BUDGET_MS;
   let allTransient = true;
   for (const model of models) {
-    if (errors.length && Date.now() - started > GENERATE_BUDGET_MS) break;
+    if (errors.length && Date.now() >= deadline) break;
     const name = model.replace('models/', '');
     try {
-      const result = parseResult(await callWithThinkingFallback(key, model, system, payload, schema));
+      const result = parseResult(await callWithThinkingFallback(key, model, system, payload, schema, deadline));
       // 이번에 된 모델을 다음 호출(이 기기에서는 다음에 앱을 열 때도) 먼저 쓴다
       cachedModels = [model, ...models.filter((m) => m !== model)];
       rememberModel(model);

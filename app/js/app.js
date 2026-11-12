@@ -623,10 +623,13 @@ window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); }
 // 앱으로 돌아올 때 날짜가 바뀌었거나 아침 동기화가 끝났을 수 있으니 다시 불러온다
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !state.user || state.sync.busy || state.sync.ai) return;
-  // 지난번 AI 분석이 지연·끊김으로 실패했으면 그것부터 다시 (최신 데이터는 그대로 두고)
+  // 지난번 AI 분석이 지연·끊김으로 실패했으면, 최신 데이터를 받은 뒤 AI 분석만 다시
+  // (날짜가 바뀐 뒤 돌아와도 어제 데이터로 분석하지 않게)
   if (aiRetryOnReturn && !state.stale && state.data?.keys.geminiApiKey) {
     aiRetryOnReturn = false;
-    runAi('AI 분석을 다시 시도해요');
+    refresh().then(() => {
+      if (!state.error && !state.sync.busy && !state.sync.ai) runAi('AI 분석을 다시 시도해요');
+    });
     return;
   }
   refresh();
