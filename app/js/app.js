@@ -12,6 +12,7 @@ import { summarizeLaps, summarizeStreams } from './run.js';
 import { emptyExercise, emptySet, parseStrengthText, setsOf } from './strength.js';
 import { SLOT_DEFAULT_TIME, STARTER_SUPPLEMENTS } from './format.js';
 import { pickDisplayDay, supplementSlots } from './model.js';
+import { aiResultMessage, bodyBatteryValue, buildStrengthEntry, nextSupplementEntry, parseRoute } from './app-logic.js';
 import { renderLogin, loginErrorText } from './screens/login.js';
 import { renderToday } from './screens/today.js';
 import { renderSleep } from './screens/sleep.js';
@@ -59,10 +60,7 @@ const view = document.getElementById('view');
 const tabbar = document.querySelector('.tabbar');
 
 // '#strength=ID' → { name: 'strength', param: 'ID' }
-function route() {
-  const [name, param] = location.hash.slice(1).split('=');
-  return screens[name] ? { name, param: param ? decodeURIComponent(param) : null } : { name: 'today', param: null };
-}
+const route = () => parseRoute(location.hash, Object.keys(screens));
 
 // 저장된 운동 → 입력용 복사본 (옛 형식도 세트 목록으로)
 const draftExercises = (list) => list.map((e) => ({ name: e.name, setList: setsOf(e).map((s) => ({ ...s })) }));
@@ -204,16 +202,7 @@ async function runAi(startMessage = null) {
   if (state.data === data && result.done.length) saveSnapshot(state.user, state.data);
   aiRetryOnReturn = result.errors.some((e) => e.transient);
 
-  const parts = [];
-  const doneLabel = { sleep: '수면 분석', exercise: '운동 코칭', day: '하루 가이드' };
-  if (result.done.length) parts.push(`AI ${result.done.map((d) => doneLabel[d]).join('·')} 받았어요`);
-  if (result.errors.length) {
-    const labels = result.errors.map((e) => e.label).join('·');
-    parts.push(result.errors.every((e) => e.transient)
-      ? `AI ${labels} 분석 실패: 응답이 늦거나 연결이 끊겼어요. 기다리는 동안 앱을 내리면 끊길 수 있어요 · 앱으로 돌아오면 다시 시도해요`
-      : `AI 분석 실패: ${result.errors.map((e) => `${e.label}: ${e.message}`).join(' / ')}`);
-  }
-  finishSync(parts.join(' · ') || null);
+  finishSync(aiResultMessage(result));
 }
 
 // 공유 메모를 저장·삭제하면 운동 코칭을 바로 다시 받는다 (메모 내용 비교 없이 무조건).
@@ -294,7 +283,7 @@ function setSupplement(id, patch) {
   const checkin = (d.checkins[d.today] ??= { date: d.today });
   const sup = (checkin.supplements ??= {});
   const def = d.supplements.find((s) => s.id === id);
-  const next = { taken: false, count: def?.countPerDose ?? 1, ...sup[id], ...patch };
+  const next = nextSupplementEntry(sup[id], def, patch);
   sup[id] = next;
   return saveSupplement(state.fb, state.user.uid, d.today, id, next);
 }
@@ -460,24 +449,8 @@ const inputs = {
 
 function submitStrength() {
   const d = state.ui.strengthDraft;
-  const num = (v, int) => {
-    if (v == null || !Number.isFinite(v) || v <= 0) return null;
-    return int ? Math.round(v) : Math.round(v * 2) / 2;
-  };
-  const exercises = d.exercises
-    .map((e) => ({
-      name: e.name.trim(),
-      setList: e.setList
-        .map((s) => ({ weightKg: num(s.weightKg, false), reps: num(s.reps, true), warmup: !!s.warmup }))
-        .filter((s) => s.weightKg != null || s.reps != null),
-    }))
-    .filter((e) => e.name);
-  if (!exercises.length) { window.alert('운동 이름을 하나 이상 적어 주세요.'); return; }
-  if (!d.date || d.date > state.data.today) { window.alert('날짜를 확인해 주세요.'); return; }
-
-  // 같은 날 가민 헬스 활동이 있으면 연결 (운동 탭에서 한 줄로 표시)
-  const act = state.data.activities.find((a) => a.date === d.date && a.sport === 'strength');
-  const entry = { date: d.date, durationMin: num(d.durationMin, true), exercises, note: d.note.trim(), activityId: act?.id ?? null };
+  const { entry, error } = buildStrengthEntry(d, state.data);
+  if (error) { window.alert(error); return; }
   const isNew = !d.id;
   const id = d.id ?? newStrengthId(state.fb, state.user.uid);
 
@@ -489,9 +462,8 @@ function submitStrength() {
 
 const changes = {
   'body-battery': (el) => {
-    const raw = el.value.trim();
-    const n = raw === '' ? null : Math.round(Number(raw));
-    if (n != null && !(n >= 0 && n <= 100)) { el.value = ''; return; }
+    const n = bodyBatteryValue(el.value);
+    if (n === undefined) { el.value = ''; return; }
     const d = state.data;
     const checkin = (d.checkins[d.today] ??= { date: d.today });
     if (n == null) delete checkin.bodyBattery; else checkin.bodyBattery = n;

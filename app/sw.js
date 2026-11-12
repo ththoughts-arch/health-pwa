@@ -1,5 +1,5 @@
 // 앱 파일을 바꾸면 버전을 올린다 → 이전 캐시 삭제
-const VERSION = 'v23';
+const VERSION = 'v24';
 const CACHE = `health-${VERSION}`;
 const SHELL = [
   './',
@@ -7,6 +7,7 @@ const SHELL = [
   'styles.css',
   'manifest.webmanifest',
   'js/app.js',
+  'js/app-logic.js',
   'js/theme.js',
   'js/score.js',
   'js/format.js',
