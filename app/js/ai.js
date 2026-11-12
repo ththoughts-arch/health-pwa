@@ -77,6 +77,14 @@ function parseResult(json) {
   }
 }
 
+// 응답 지연·연결 끊김: 키·요청 문제가 아니라 다시 하면 될 수 있는 실패
+export class TransientError extends Error {
+  constructor(message) {
+    super(message);
+    this.transient = true;
+  }
+}
+
 async function callModel(key, model, body) {
   for (let attempt = 0; ; attempt++) {
     // 한 번 호출이 너무 오래 걸리면 끊고 다음 모델로 (generate에서 처리)
@@ -91,8 +99,11 @@ async function callModel(key, model, body) {
         signal: ctrl.signal,
       });
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error(`${CALL_TIMEOUT_MS / 1000}초 안에 응답이 없어요`);
-      throw e;
+      if (e.name === 'AbortError') throw new TransientError(`${CALL_TIMEOUT_MS / 1000}초 안에 응답이 없어요`);
+      // 연결 끊김(Failed to fetch 등): 앱을 내렸거나 네트워크가 바뀐 경우가 많다 → 잠깐 뒤 같은 모델로 다시
+      if (attempt >= RETRY_WAITS_MS.length) throw new TransientError('네트워크 연결이 끊겼어요');
+      await sleep(RETRY_WAITS_MS[attempt]);
+      continue;
     } finally {
       clearTimeout(timer);
     }
@@ -102,7 +113,9 @@ async function callModel(key, model, body) {
   }
 }
 
-const CALL_TIMEOUT_MS = 30000;
+// 긴 입력(수면 v2·오늘의 운동)은 30초를 넘기기도 해서 넉넉히. 한 분석 전체는 GENERATE_BUDGET_MS 안에서만 모델을 바꿔 시도
+const CALL_TIMEOUT_MS = 90000;
+const GENERATE_BUDGET_MS = 150000;
 // 최신 모델은 답하기 전 생각(thinking)에 시간을 쓴다 → 짧게(low). 지원하지 않는 모델은 빼고 다시 보낸다
 const THINKING = { thinkingLevel: 'low' };
 const noThinkingConfig = new Set();
@@ -135,7 +148,10 @@ async function callWithThinkingFallback(key, model, system, payload, schema) {
 async function generate(key, system, payload, schema) {
   const models = await candidateModels(key);
   const errors = [];
+  const started = Date.now();
+  let allTransient = true;
   for (const model of models) {
+    if (errors.length && Date.now() - started > GENERATE_BUDGET_MS) break;
     const name = model.replace('models/', '');
     try {
       const result = parseResult(await callWithThinkingFallback(key, model, system, payload, schema));
@@ -146,10 +162,13 @@ async function generate(key, system, payload, schema) {
     } catch (e) {
       // 키 문제는 다른 모델로 바꿔도 같으니 바로 중단. 그 밖(바쁨·한도·요청 오류·응답 잘림)은 다음 모델로
       if (e instanceof GeminiError && e.keyProblem) throw e;
+      if (!(e.transient || (e instanceof GeminiError && BUSY.includes(e.status)))) allTransient = false;
       errors.push(`${name}: ${e.message}`);
     }
   }
-  // 모든 모델 실패: 모델별 이유를 함께 보여 준다
+  // 모든 모델 실패: 지연·끊김·서버 바쁨뿐이면 다시 시도할 수 있는 실패로
+  console.warn('Gemini 실패', errors);
+  if (allTransient) throw new TransientError(errors.join(' / '));
   throw new Error(errors.join(' / '));
 }
 
@@ -592,7 +611,7 @@ export async function runCoaching(fb, uid, data, onResult = () => {}, onStart = 
       onResult(kind);
     } catch (e) {
       console.error(e);
-      errors.push(`${label[kind]}: ${e.message}`);
+      errors.push({ kind, label: label[kind], message: e.message, transient: !!e.transient });
     }
   };
   onStart([...tasks.map(([kind]) => kind), ...(needDay ? ['day'] : [])]);

@@ -179,7 +179,14 @@ async function runSync() {
   }
 
   // 점수·기록은 바로 보여 주고, AI 문장은 도착하는 대로 채운다
-  state.sync = { busy: false, ai: true, step: 'AI 분석 중…', message: '동기화했어요' };
+  await runAi('동기화했어요');
+}
+
+// 응답 지연·연결 끊김으로 실패하면, 앱으로 돌아왔을 때 AI 분석만 한 번 더 (visibilitychange)
+let aiRetryOnReturn = false;
+
+async function runAi(startMessage = null) {
+  state.sync = { busy: false, ai: true, step: 'AI 분석 중…', message: startMessage };
   render();
   const data = state.data;
   let result;
@@ -192,12 +199,20 @@ async function runSync() {
       render();
     });
   } catch (e) {
-    result = { done: [], errors: [e.message], pending: 1 };
+    result = { done: [], errors: [{ label: 'AI', message: e.message, transient: !!e.transient }], pending: 1 };
   }
+  if (state.data === data && result.done.length) saveSnapshot(state.user, state.data);
+  aiRetryOnReturn = result.errors.some((e) => e.transient);
+
   const parts = [];
   const doneLabel = { sleep: '수면 분석', exercise: '운동 코칭', day: '하루 가이드' };
   if (result.done.length) parts.push(`AI ${result.done.map((d) => doneLabel[d]).join('·')} 받았어요`);
-  if (result.errors.length) parts.push(`AI 분석 실패: ${result.errors.join(' / ')}`);
+  if (result.errors.length) {
+    const labels = result.errors.map((e) => e.label).join('·');
+    parts.push(result.errors.every((e) => e.transient)
+      ? `AI ${labels} 분석 실패: 응답이 늦거나 연결이 끊겼어요. 기다리는 동안 앱을 내리면 끊길 수 있어요 · 앱으로 돌아오면 다시 시도해요`
+      : `AI 분석 실패: ${result.errors.map((e) => `${e.label}: ${e.message}`).join(' / ')}`);
+  }
   finishSync(parts.join(' · ') || null);
 }
 
@@ -607,7 +622,14 @@ window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); }
 
 // 앱으로 돌아올 때 날짜가 바뀌었거나 아침 동기화가 끝났을 수 있으니 다시 불러온다
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.user && !state.sync.busy && !state.sync.ai) refresh();
+  if (document.visibilityState !== 'visible' || !state.user || state.sync.busy || state.sync.ai) return;
+  // 지난번 AI 분석이 지연·끊김으로 실패했으면 그것부터 다시 (최신 데이터는 그대로 두고)
+  if (aiRetryOnReturn && !state.stale && state.data?.keys.geminiApiKey) {
+    aiRetryOnReturn = false;
+    runAi('AI 분석을 다시 시도해요');
+    return;
+  }
+  refresh();
 });
 
 // 빠른 실행: 지난번 데이터를 기기에서 꺼내 바로 보여 주고, 로그인 확인·최신 데이터는 뒤에서

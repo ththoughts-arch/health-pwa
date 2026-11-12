@@ -2,7 +2,8 @@
 // exercise = { name, setList: [{ weightKg, reps, warmup }] }
 // 옛 기록은 { name, weightKg, sets, reps } 형식 → setsOf()가 세트 목록으로 펼친다
 
-const EMPTY_BAR_KG = 20;   // '빈바'
+const EMPTY_BAR_KG = 20;   // '빈바' = '빈봉' (띄어 써도 됨)
+const EMPTY_BAR = /^빈\s*[바봉]$/;
 
 export const emptySet = () => ({ weightKg: null, reps: null, warmup: false });
 export const emptyExercise = () => ({ name: '', setList: [emptySet()] });
@@ -27,7 +28,7 @@ export function exerciseSummary(e) {
   return `${e.name}${top ? ` 최고 ${top}kg ·` : ''} ${work.length}세트`;
 }
 
-const WEIGHT = '(빈바|맨몸|\\d+(?:\\.\\d+)?)\\s*(?:kg|킬로)?';
+const WEIGHT = '(빈\\s*[바봉]|맨몸|\\d+(?:\\.\\d+)?)\\s*(?:kg|킬로)?';
 const REPS = '(\\d+)\\s*(?:개|회|번|reps?)?';
 // 무게와 횟수 사이에 구분자나 공백이 꼭 있어야 한다 ('50' 한 줄을 5kg 0회로 읽지 않게)
 const SET_LINE = new RegExp(`^${WEIGHT}(?:\\s*[:：×xX*✕]\\s*|\\s+)${REPS}$`, 'i');
@@ -35,7 +36,7 @@ const SET_TOKEN = new RegExp(`^${WEIGHT}\\s*[×xX*✕:：]\\s*${REPS}$`, 'i');
 const DATE_LINE = /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})\.?\s*(.*)$/;
 
 function toSet(weight, reps) {
-  const weightKg = weight === '빈바' ? EMPTY_BAR_KG : weight === '맨몸' ? null : Number(weight);
+  const weightKg = EMPTY_BAR.test(weight) ? EMPTY_BAR_KG : weight === '맨몸' ? null : Number(weight);
   return { weightKg, reps: Number(reps), warmup: false };
 }
 

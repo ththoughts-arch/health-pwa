@@ -36,6 +36,11 @@ test('운동 이름 다음 줄에 세트를 쉼표로 나열, 괄호 메모(워�
   assert.deepEqual(pairs(r.exercises[1]), [[20, 10], [20, 10], [20, 10]]);
 });
 
+test('빈봉·빈 바·빈 봉도 빈바(20kg)로', () => {
+  const r = parseStrengthText('스쿼트\n빈봉×10, 빈 바×8\n빈 봉 : 6개');
+  assert.deepEqual(pairs(r.exercises[0]), [[20, 10], [20, 8], [20, 6]]);
+});
+
 test('첫 줄의 운동 시간(분)을 읽고 메모에서 뺀다', () => {
   const r = parseStrengthText('2026-11-05 상체 60분 (첫 세트는 워밍업)\n스쿼트: 60×10');
   assert.equal(r.durationMin, 60);
