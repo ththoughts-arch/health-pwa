@@ -91,18 +91,30 @@ export async function loadAll(fb, uid) {
 }
 
 // 채팅 코칭 기록 (coach/day-YYYY-MM-DD, coach/sess-…, coach/week-…, coach/report-…). docs/coach-model.md
-// 문서 ID 접두어로 범위 조회 → 복합 색인·규칙 변경 없이 기존 coach/{docId} 규칙 그대로 사용
+// 문서 ID 접두어로 범위 조회 → 기존 coach/{docId} 규칙 그대로 사용.
+// 문서 ID 오름차순(기본 정렬)만 쓴다: __name__ 내림차순 정렬은 색인이 따로 필요해서 실패함 (2026-11-17 확인)
+// 코칭 기록을 못 읽어도 앱의 나머지(영양제 등)는 열리게 한다
 async function loadCoach(fb, user) {
-  const { collection, query, where, orderBy, getDocs, documentId, limit } = fb.fs;
+  const { collection, query, where, getDocs, documentId } = fb.fs;
   const col = collection(user, 'coach');
-  const range = (prefix, n) => soft(getDocs(query(col,
-    where(documentId(), '>=', `${prefix}-`), where(documentId(), '<', `${prefix}.`),
-    orderBy(documentId(), 'desc'), limit(n))));
+  const today = localToday();
+  const range = async (prefix, from = '') => {
+    try {
+      const snap = await getDocs(query(col,
+        where(documentId(), '>=', `${prefix}-${from}`), where(documentId(), '<', `${prefix}.`)));
+      return snap.docs.map((d) => d.data());
+    } catch (e) {
+      console.error('coach', prefix, e);
+      return null;
+    }
+  };
+  const since = addDays(today, -120);
   const [days, sessions, weeks, reports] = await Promise.all([
-    range('day', 120), range('sess', 300), range('week', 30), range('report', 60),
+    range('day', since), range('sess', since), range('week', addDays(since, -7)), range('report'),
   ]);
-  const list = (snap) => (snap.docs ?? []).map((d) => d.data());
+  const list = (x) => x ?? [];
   return {
+    failed: [days, sessions, weeks, reports].some((x) => x === null),
     days: Object.fromEntries(list(days).filter((d) => d.date).map((d) => [d.date, d])),
     sessions: list(sessions).sort((a, b) => String(b.sortKey ?? b.date).localeCompare(String(a.sortKey ?? a.date))),
     weeks: Object.fromEntries(list(weeks).filter((w) => w.monday).map((w) => [w.monday, w])),

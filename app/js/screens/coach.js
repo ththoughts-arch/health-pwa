@@ -98,7 +98,8 @@ export function renderCoachToday(state) {
         <div class="c-progress"><div style="width:${Math.round(done / slots.length * 100)}%"></div></div></section>`;
     }
   }
-  return `<div class="cv">${hero}${brief}${updates}${todaySess}${supBlock}</div>`;
+  const failed = c.failed ? '<section class="c-sec"><div class="c-alert"><i class="c-dot"></i><div><b>코칭 기록을 불러오지 못했어요</b><span>잠시 뒤 앱을 다시 열어 주세요. 계속되면 채팅에 알려 주세요.</span></div></div></section>' : '';
+  return `<div class="cv">${hero}${failed}${brief}${updates}${todaySess}${supBlock}</div>`;
 }
 
 // ---------- 수면 ----------
