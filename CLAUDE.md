@@ -191,3 +191,11 @@ API 키·VAPID 키는 저장소에 커밋하지 않는다. GitHub Actions용은 
 - 가민 비밀번호를 받아 대신 로그인하는 방식은 절대 쓰지 않는다.
 - 카카오톡 알림은 쓰지 않는다(나에게 보내기는 본인만 가능, 알림톡은 사업자·유료). 웹 푸시로 대체.
 - Gemini 무료 한도를 넘지 않게 사용자 수와 호출 횟수를 관리.
+
+## 10. 코칭 대시보드로 전환 (2026-11-17, 사용자 결정)
+
+- 분석·조언은 Claude 프로젝트 채팅("운동 기록 및 코칭")에서 받고, 이 앱은 그 내용을 다시 보는 대시보드가 된다. 오늘 컨디션 점수(6장)가 실제 상태와 안 맞았던 것도 이유.
+- 하단 탭: **오늘 · 수면 · 운동(전체·러닝·트레일러닝·헬스·수영) · 영양제 · 리포트**. 메모 탭은 빠지고 설정 화면 링크로 남김. 예전 오늘·수면·운동 화면(동기화·점수·Gemini)은 `#old-today` 등으로 남김.
+- 데이터: 채팅의 Claude가 `tools/coach-write.mjs`(Admin SDK, 서비스 계정)로 `users/{uid}/coach/day-…|sess-…|week-…|report-…`에 쓴다 → `docs/coach-model.md`. 앱은 읽기만(`js/screens/coach.js`, `data.js loadCoach`).
+- 판정은 채팅 코칭의 🟢🟡🔴(`verdict.level`)이 기준이고 테마도 이걸 따른다(green→good, yellow→normal, red→low).
+- 영양제 체크는 기존 화면 그대로(`checkins`). 채팅에서 "먹었어"라고 하면 Claude가 `coach-write.mjs supp`로 체크.

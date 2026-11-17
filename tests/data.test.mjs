@@ -20,6 +20,7 @@ function fakeFb(store, { deny = [], fail = [] } = {}) {
     where: (...a) => ['where', ...a],
     orderBy: (...a) => ['orderBy', ...a],
     limit: (n) => ['limit', n],
+    documentId: () => '__name__',
     getDoc: async (r) => { check(r.path); return { data: () => store[r.path] }; },
     getDocs: async (q) => {
       check(q.path);

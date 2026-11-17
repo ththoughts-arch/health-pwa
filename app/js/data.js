@@ -64,6 +64,7 @@ export async function loadAll(fb, uid) {
     soft(getDocs(query(collection(user, 'memos'), orderBy('createdAt', 'desc'), fb.fs.limit(MEMO_LIMIT)))),
     soft(getDoc(doc(user, 'coach', 'day'))),
   ]);
+  const coachLog = await loadCoach(fb, user);
 
   const byDate = (snap) => Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
   return {
@@ -85,6 +86,27 @@ export async function loadAll(fb, uid) {
       .filter((s) => s.active !== false)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     strength: sortStrength(strength.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    coach: coachLog,
+  };
+}
+
+// 채팅 코칭 기록 (coach/day-YYYY-MM-DD, coach/sess-…, coach/week-…, coach/report-…). docs/coach-model.md
+// 문서 ID 접두어로 범위 조회 → 복합 색인·규칙 변경 없이 기존 coach/{docId} 규칙 그대로 사용
+async function loadCoach(fb, user) {
+  const { collection, query, where, orderBy, getDocs, documentId, limit } = fb.fs;
+  const col = collection(user, 'coach');
+  const range = (prefix, n) => soft(getDocs(query(col,
+    where(documentId(), '>=', `${prefix}-`), where(documentId(), '<', `${prefix}.`),
+    orderBy(documentId(), 'desc'), limit(n))));
+  const [days, sessions, weeks, reports] = await Promise.all([
+    range('day', 120), range('sess', 300), range('week', 30), range('report', 60),
+  ]);
+  const list = (snap) => (snap.docs ?? []).map((d) => d.data());
+  return {
+    days: Object.fromEntries(list(days).filter((d) => d.date).map((d) => [d.date, d])),
+    sessions: list(sessions).sort((a, b) => String(b.sortKey ?? b.date).localeCompare(String(a.sortKey ?? a.date))),
+    weeks: Object.fromEntries(list(weeks).filter((w) => w.monday).map((w) => [w.monday, w])),
+    reports: list(reports).sort((a, b) => String(b.period).localeCompare(String(a.period))),
   };
 }
 

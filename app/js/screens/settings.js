@@ -60,6 +60,12 @@ export function renderSettings({ data, user, ui }) {
       </div>
 
       <div class="block">
+        <span class="block-title">예전 화면</span>
+        <p class="sub">2026-11-17부터 오늘·수면·운동은 채팅 코칭 기록을 보여 줘요. 예전 화면(가민 동기화·점수·Gemini)은 아래에서 열 수 있어요.</p>
+      </div>
+      <div class="setting-row"><a class="link-inline" href="#old-today">예전 오늘</a><a class="link-inline" href="#old-sleep">예전 수면</a><a class="link-inline" href="#old-exercise">예전 운동</a><a class="link-inline" href="#memo">메모</a></div>
+
+      <div class="block">
         <span class="block-title">동기화 · AI 연결</span>
         <p class="sub">키는 내 계정에만 저장되고 나만 읽을 수 있어요. ${lastSyncText(data)}</p>
       </div>

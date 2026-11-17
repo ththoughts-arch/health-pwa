@@ -23,14 +23,21 @@ import { renderSupplementsEdit } from './screens/supplements-edit.js';
 import { renderStrength } from './screens/strength.js';
 import { renderRun } from './screens/run.js';
 import { renderMemo } from './screens/memo.js';
+import { coachCondition, coachDate, renderCoachExercise, renderCoachSleep, renderCoachToday, renderReports } from './screens/coach.js';
+import { addDays } from './score.js';
 
 // 화면 함수는 (state, param) — param은 '#run=ID'의 ID 등
 const screens = {
-  today: renderToday,
-  sleep: renderSleep,
-  exercise: renderExercise,
+  // 2026-11-17: 오늘·수면·운동은 채팅 코칭(coach/) 화면. 예전 화면은 #old-today 등으로 남김
+  today: renderCoachToday,
+  sleep: renderCoachSleep,
+  exercise: renderCoachExercise,
   supplements: renderSupplements,
+  reports: renderReports,
   memo: renderMemo,
+  'old-today': renderToday,
+  'old-sleep': renderSleep,
+  'old-exercise': renderExercise,
   'supplements-edit': renderSupplementsEdit,
   strength: renderStrength,
   run: renderRun,
@@ -38,7 +45,7 @@ const screens = {
 };
 
 // 하위 화면에서 켜 둘 하단 탭
-const TAB_OF = { 'supplements-edit': 'supplements', strength: 'exercise', run: 'exercise' };
+const TAB_OF = { 'supplements-edit': 'supplements', strength: 'exercise', run: 'exercise', 'old-today': 'today', 'old-sleep': 'sleep', 'old-exercise': 'exercise' };
 
 const state = {
   fb: null,
@@ -133,7 +140,7 @@ function render() {
 
   if (name === 'strength') ensureStrengthDraft(param);
   if (name === 'memo') ensureMemoDraft(param);
-  setCondition(conditionFromScore(pickDisplayDay(state.data)?.score?.total));
+  setCondition(name.startsWith('old-') ? conditionFromScore(pickDisplayDay(state.data)?.score?.total) : coachCondition(state));
   const toast = state.error ?? state.sync.message;
   view.innerHTML = screens[name](state, param)
     + (toast ? `<p class="toast" role="status">${toast}</p>` : '');
@@ -297,6 +304,14 @@ function editSupplement(id, patch) {
 }
 
 const actions = {
+  // 코칭 화면: 날짜 이동·종목 필터
+  'cv-prev': () => { state.ui.coachDate = addDays(coachDate(state), -1); render(); },
+  'cv-next': () => {
+    const d = coachDate(state);
+    if (d < state.data.today) { state.ui.coachDate = addDays(d, 1); render(); }
+  },
+  'cv-today': () => { state.ui.coachDate = state.data.today; render(); },
+  'cv-sport': (el) => { state.ui.coachSport = el.dataset.sport; render(); },
   'sleep-range': (el) => { state.ui.sleepRange = el.dataset.range; render(); },
   sport: (el) => { state.ui.sport = el.dataset.sport; render(); },
   feedback: (el) => { state.ui.feedback = el.dataset.mode; render(); },
